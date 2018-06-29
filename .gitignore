@@ -14,3 +14,5 @@
 # remove dependency libraries
 vendor/*
 
+# remove the executable
+quebroker
