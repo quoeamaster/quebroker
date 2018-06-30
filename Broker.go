@@ -19,4 +19,21 @@ package main
 type Broker struct {
     // UUID for the broker (must be unique within a cluster)
     UUID string
+
+    // broker config wrapper
+    config *BrokerConfig
 }
+
+func NewBroker(configPath string) (*Broker, error) {
+    m := new(Broker)
+
+    configInstancePtr, err := NewBrokerConfig(configPath)
+    if err != nil {
+        return nil, err
+    }
+    m.config = configInstancePtr
+
+    return m, nil
+}
+
+

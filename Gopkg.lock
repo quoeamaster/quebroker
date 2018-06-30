@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/quoeamaster/CFactor"
+  packages = ["TOML"]
+  revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
+  version = "v0.1.2"
+
+[[projects]]
   name = "gopkg.in/urfave/cli.v1"
   packages = ["."]
   revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
@@ -10,6 +16,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2e34d09c263385ef5f6773a01051a762db87addda70c7e0e815b48db62fc5c7f"
+  inputs-digest = "c45254d22e7e6ed5725bbebdf3beb1fcb9b264cafd153b41c44684bda1ee37ee"
   solver-name = "gps-cdcl"
   solver-version = 1
