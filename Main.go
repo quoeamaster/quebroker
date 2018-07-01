@@ -24,12 +24,15 @@ func main() {
     }
 
     queBroker.Action = func(ctx *cli.Context) error {
-        brokerInstance, err := NewBroker(ctx.String("C"))
+        brokerInstance := GetBroker(ctx.String("C"))
+        // TODO: startup the broker
+        err := brokerInstance.StartBroker()
         if err != nil {
             panic(err)
         }
+
         fmt.Println(brokerInstance.config.GetPath())
-        fmt.Println(brokerInstance.config.BrokerName)
+        fmt.Println(brokerInstance.config.String())
 
         return nil
     }

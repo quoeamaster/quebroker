@@ -23,17 +23,16 @@ import (
     "runtime"
     "fmt"
     "reflect"
+    "bytes"
 )
 
 // environment variable pointing to the path of the que broker config file
 const envVarBrokerConfigPath = "QUE_BROKER_CONFIG_PATH"
 
-// default broker config file (unix based os)
-const defaultBrokerConfigPathUnix = "/usr/local/que/queBroker.toml"
-// default broker config file (windows based os)
-const defaultBrokerConfigPathWindows = "c:\\que\\queBroker.toml"
+// the path containing the config files under the current user's home directory
+const homeDirectoryConfigDir = ".que"
 
-// locat broker config file (the relative path)
+// local broker config file (the relative path)
 const localBrokerConfigPath = "queBroker.toml"
 
 
@@ -47,11 +46,45 @@ type BrokerConfig struct {
     // (name could be duplicated, in general Que will identify a broker by UUID,
     // name is for readability purpose)
     BrokerName string `toml:"broker.name"`
+
+    // the path for storing all sorts of logs
+    LogFolder string `toml:"log.path"`
+    // the number of rotated files kept (default is 3)
+    LogRotationDays int `toml:"log.rotation.days"`
+
+    // the path for storing the messages
+    DataFolder string `toml:"data.path"`
+
+    // the broker's accessible address (communicate with clients or
+    // other Brokers within the cluster), format is host|ip:portNo
+    BrokerCommunicationAddress string `toml:"broker.communication.address"`
 }
 
 // a must provided lifecyclehook method
 func (o *BrokerConfig) SetStructsReferences(refs *map[string]interface{}) error {
     return nil
+}
+
+func (o *BrokerConfig) String() string {
+    var buf bytes.Buffer
+
+    buf.WriteString("\n")
+    buf.WriteString("------------------------------\n")
+    buf.WriteString("|     configuration  set     |\n")
+    buf.WriteString("------------------------------\n")
+
+    buf.WriteString(fmt.Sprintf("%v => %v\n\n", "* CONFIG FILE PATH", o.path))
+
+    //buf.WriteString(fmt.Sprintf("%v %80s", "broker.name", "= " + o.BrokerName))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.name", o.BrokerName))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.communication.address", o.BrokerCommunicationAddress))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.path", o.LogFolder))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.rotation.days", o.LogRotationDays))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "data.path", o.DataFolder))
+
+
+    buf.WriteString("\n")
+    return buf.String()
 }
 
 
@@ -68,6 +101,8 @@ func NewBrokerConfig(path string) (*BrokerConfig, error) {
     return m, nil
 }
 
+// load the config file based on the given path; the sequences are as follows:
+
 func (b *BrokerConfig) loadConfig(path string) (string, error) {
     finalPath := ""
 
@@ -79,13 +114,19 @@ func (b *BrokerConfig) loadConfig(path string) (string, error) {
         finalPath = localBrokerConfigPath
     } else {
         // c) the default config location based on os
+        userHomeDir, err := queutil.GetCurrentUserHomeDir()
+        if err != nil {
+            return "", err
+        }
         if strings.Compare(runtime.GOOS, "windows") == 0 {
-            if queutil.IsFileExists(defaultBrokerConfigPathWindows) == true {
-                finalPath = defaultBrokerConfigPathWindows
+            hdFile := userHomeDir + "\\" + homeDirectoryConfigDir + "\\" + localBrokerConfigPath
+            if queutil.IsFileExists(hdFile) == true {
+                finalPath = hdFile
             }
         } else {
-            if queutil.IsFileExists(defaultBrokerConfigPathUnix) == true {
-                finalPath = defaultBrokerConfigPathUnix
+            hdFile := userHomeDir + "/" + homeDirectoryConfigDir + "/" + localBrokerConfigPath
+            if queutil.IsFileExists(hdFile) == true {
+                finalPath = hdFile
             }
         }
     }

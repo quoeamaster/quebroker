@@ -2,6 +2,15 @@
 
 
 [[projects]]
+  name = "github.com/emicklei/go-restful"
+  packages = [
+    ".",
+    "log"
+  ]
+  revision = "3658237ded108b4134956c1b3050349d93e7b895"
+  version = "v2.7.1"
+
+[[projects]]
   name = "github.com/quoeamaster/CFactor"
   packages = ["TOML"]
   revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
@@ -16,6 +25,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c45254d22e7e6ed5725bbebdf3beb1fcb9b264cafd153b41c44684bda1ee37ee"
+  inputs-digest = "716baa980730b0a20ea9d1c811cc2ffb84bc6af328153decafe27f22551dca24"
   solver-name = "gps-cdcl"
   solver-version = 1
