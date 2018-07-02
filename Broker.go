@@ -129,7 +129,7 @@ func (b *Broker) StartBroker() error {
     b.webserver.Add(NewStatsApiModule())
 
     // c) rename broker.id => broker.id.lock and LOCK the file as well
-    err := queutil.RenameFile(brokerIdFile, brokerIdLockFile)
+    err := queutil.RenameFile(brokerIdFile, brokerIdLockFile, 0444)
     if err != nil {
         return err
     }
@@ -137,9 +137,9 @@ func (b *Broker) StartBroker() error {
     if err != nil {
         return err
     }
-    _, err = queutil.LockFile(lockFilePath)
+    err = queutil.LockFile(lockFilePath)
     if err != nil {
-        fmt.Println ("yoyoyoyoyoy")
+        fmt.Printf("trying to lock [%v]\n", lockFilePath)
         return err
     }
 
@@ -163,7 +163,7 @@ func (b *Broker) appendFileToWD(file string) (string, error) {
 func (b *Broker) Release(optionalParams map[string]interface{}) error {
     // resource release here
 
-    err := queutil.RenameFile(brokerIdLockFile, brokerIdFile)
+    err := queutil.RenameFile(brokerIdLockFile, brokerIdFile, 0444)
     if err != nil {
         return err
     }
@@ -173,7 +173,7 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
     }
     err = queutil.UnlockFile(lockFilePath)
     if err != nil {
-        fmt.Println("zzzz")
+        fmt.Printf("trying to unlock [%v] but got exception => [%v]\n", lockFilePath, err)
         return err
     }
 
