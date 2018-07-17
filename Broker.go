@@ -188,6 +188,8 @@ func (b *Broker) appendFileToWD(file string) (string, error) {
 // resource(s) to be released before stopping the broker
 func (b *Broker) Release(optionalParams map[string]interface{}) error {
     // resource release here
+    l := b.logger
+    l.Info([]byte("release resource(s) sequence [ACTIVATE]...\n"))
 
     err := queutil.RenameFile(brokerIdLockFile, brokerIdFile, 0444)
     if err != nil {
@@ -202,8 +204,9 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
         fmt.Printf("trying to unlock [%v] but got exception => [%v]\n", lockFilePath, err)
         return err
     }
+    l.Debug([]byte("released broker.id.lock -> broker.id\n"))
 
-
+    l.Info([]byte("release resource(s) sequence [DONE]\n"))
     return nil
 }
 
@@ -217,7 +220,8 @@ func (b *Broker) listenToExitSequences() {
     // call cleanup method(s)
     err := b.Release(nil)
     if err != nil {
-        fmt.Println(err)
+        b.logger.Err([]byte(err.Error() + "\n"))
+        // fmt.Println(err)
     }
     os.Exit(1)
 }
