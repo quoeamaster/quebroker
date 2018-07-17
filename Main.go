@@ -4,7 +4,6 @@ import (
     "gopkg.in/urfave/cli.v1"
     "os"
     "log"
-    "fmt"
 )
 
 func main() {
@@ -23,21 +22,23 @@ func main() {
         },
     }
 
+    // the only action is to start the broker
     queBroker.Action = func(ctx *cli.Context) error {
         brokerInstance := GetBroker(ctx.String("C"))
-        // TODO: startup the broker
+
+        // fmt.Println(brokerInstance.config.GetPath())
+        // fmt.Println(brokerInstance.config.String())
+
+        // startup the broker
         err := brokerInstance.StartBroker()
         if err != nil {
             panic(err)
         }
 
-        fmt.Println(brokerInstance.config.GetPath())
-        fmt.Println(brokerInstance.config.String())
-
         return nil
     }
 
-
+    // start the terminal / console app
     err := queBroker.Run(os.Args)
     if err != nil {
         log.Fatal(err)

@@ -51,6 +51,10 @@ type BrokerConfig struct {
     LogFolder string `toml:"log.path"`
     // the number of rotated files kept (default is 3)
     LogRotationDays int `toml:"log.rotation.days"`
+    // the max file size per log
+    LogMaxFileSizeInMb int `toml:"log.max.size.mb"`
+    // the default log level (logs with level equals to or greater than this value would be logged)
+    LogLevel string `toml:"log.level"`
 
     // the path for storing the messages
     DataFolder string `toml:"data.path"`
@@ -80,6 +84,8 @@ func (o *BrokerConfig) String() string {
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.communication.address", o.BrokerCommunicationAddress))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.path", o.LogFolder))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.rotation.days", o.LogRotationDays))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.max.size.mb", o.LogMaxFileSizeInMb))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.level", o.LogLevel))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "data.path", o.DataFolder))
 
 

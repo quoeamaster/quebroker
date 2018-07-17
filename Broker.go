@@ -36,6 +36,9 @@ const brokerIdFile = "broker.id"
 // broker.id.lock and "locked" up for updating
 const brokerIdLockFile = "broker.id.lock"
 
+// default log file name => quebroker.log
+const brokerLogFilename = "quebroker.log"
+
 // lock for the Broker singleton creation
 var syncLock sync.Once
 var brokerInstance *Broker
@@ -53,8 +56,15 @@ type Broker struct {
 
     // container for the RESTful-abled server
     webserver *restful.Container
+
+    // logger for the Broker
+    logger *queutil.FlexLogger
 }
 
+// TODO: test singleton feature (really per routine is a singleton???)
+
+// return the only instance / singleton of a Broker
+// (so every routine / thread would only have 1 Broker instance)
 func GetBroker(configPath string) *Broker {
     syncLock.Do(func() {
         var err error
@@ -86,6 +96,9 @@ func newBroker(configPath string) (*Broker, error) {
 
     // restful.Container, add modules to implement REST api(s) later on
     m.webserver = restful.NewContainer()
+
+    // set logger
+    m.GetFlexLogger()
 
     return m, nil
 }
@@ -119,14 +132,20 @@ func (b *Broker) getBrokerUUID() (bool, string, error) {
     }
 }
 
+// method to start the broker instance
 func (b *Broker) StartBroker() error {
-    // bootstrap logs
+    // TODO bootstrap logs
+    l := b.logger
+    l.Info([]byte("initializing...\n"))
 
     // a) start the routine to listen for exit signals
     go b.listenToExitSequences()
+    l.Debug([]byte("exit sequence hooks added.\n"))
 
+// TODO: add more modules (modules = rest API)
     // b) add api modules
     b.webserver.Add(NewStatsApiModule())
+    l.Info([]byte("[modules - stats] added.\n"))
 
     // c) rename broker.id => broker.id.lock and LOCK the file as well
     err := queutil.RenameFile(brokerIdFile, brokerIdLockFile, 0444)
@@ -142,17 +161,23 @@ func (b *Broker) StartBroker() error {
         fmt.Printf("trying to lock [%v]\n", lockFilePath)
         return err
     }
+    l.Debug([]byte("locking broker.id file -> broker.id.lock\n"))
 
 
     // d) start the http server
     return http.ListenAndServe(b.config.BrokerCommunicationAddress, b.webserver)
 }
 
-func (b *Broker) appendFileToWD(file string) (string, error) {
+func (b *Broker) getPathSeparator() string {
     slash := "/"
     if strings.Compare(runtime.GOOS, "windows") == 0 {
         slash = "\\"
     }
+    return slash
+}
+
+func (b *Broker) appendFileToWD(file string) (string, error) {
+    slash := b.getPathSeparator()
     path, err := os.Getwd()
     if err != nil {
         return "", err
@@ -160,6 +185,7 @@ func (b *Broker) appendFileToWD(file string) (string, error) {
     return fmt.Sprintf("%v%v%v", path, slash, file), nil
 }
 
+// resource(s) to be released before stopping the broker
 func (b *Broker) Release(optionalParams map[string]interface{}) error {
     // resource release here
 
@@ -196,6 +222,8 @@ func (b *Broker) listenToExitSequences() {
     os.Exit(1)
 }
 
+
+// add a web module / REST api to the underlying webservice object
 func (b *Broker) AddModules(module *restful.WebService) error {
     if module == nil {
         return fmt.Errorf("invalid module supplied~ [%v]", module)
@@ -203,4 +231,31 @@ func (b *Broker) AddModules(module *restful.WebService) error {
     b.webserver.Add(module)
 
     return nil
+}
+
+// setup the FlexLogger for logging purpose
+// (default is console and rolling-file logger)
+func (b *Broker) GetFlexLogger() *queutil.FlexLogger {
+    b.logger = queutil.NewFlexLogger()
+    // append logger implementations
+    b.logger.AddLogger(queutil.NewConsoleLogger()).AddLogger(queutil.NewRollingFileLogger(
+        fmt.Sprint(b.config.LogFolder, b.getPathSeparator(), brokerLogFilename),
+        b.config.LogMaxFileSizeInMb, b.config.LogRotationDays,
+        b.config.LogRotationDays, false))
+
+    // set level based on the config file
+    switch b.config.LogLevel {
+    case "debug":
+        b.logger.LogLevel = queutil.LogLevelDebug
+    case "info":
+        b.logger.LogLevel = queutil.LogLevelInfo
+    case "warn":
+        b.logger.LogLevel = queutil.LogLevelWarn
+    case "err":
+        b.logger.LogLevel = queutil.LogLevelErr
+    default:
+        b.logger.LogLevel = queutil.LogLevelInfo
+    }
+
+    return b.logger
 }
