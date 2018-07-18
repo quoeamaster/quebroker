@@ -149,7 +149,7 @@ func (b *Broker) StartBroker() error {
     l.Debug([]byte("exit sequence hooks added.\n"))
 
     // a2) load cluster status information
-    b.clusterStatusSrv.LoadClusterStates()
+    b.clusterStatusSrv.LoadClusterStatus()
 
 // TODO: add more modules (modules = rest API)
     // b) add api modules
@@ -214,6 +214,8 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
         return err
     }
     l.Debug([]byte("released broker.id.lock -> broker.id\n"))
+
+// TODO: final updates on cluster status
 
     l.Info([]byte("release resource(s) sequence [DONE]\n"))
     return nil
