@@ -13,12 +13,23 @@ func NewStatsApiModule() *restful.WebService {
         Produces(restful.MIME_JSON)
     // declare the REST methods with the http verbs
     srv.Route(srv.GET("/").To(getOverallBrokerStats))
+    srv.Route(srv.GET("/config").To(getConfigurationStats))
 
     return srv
 }
 
-func getOverallBrokerStats(req *restful.Request, res *restful.Response) {
+// return overall status of the broker instance (TODO: get real information, now it is for testing purpose)
+func getOverallBrokerStats (req *restful.Request, res *restful.Response) {
     res.WriteHeaderAndJson(200, fmt.Sprintf("stats returned... %v", GetBroker("")), restful.MIME_JSON)
+}
+
+// return the configuration settings for this broker instance
+func getConfigurationStats (req *restful.Request, res *restful.Response) {
+    b := GetBroker("")
+
+    // get the config(s) from config-file
+    res.WriteHeader(200)
+    res.Write([]byte(b.config.String()))
 }
 
 

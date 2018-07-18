@@ -11,10 +11,22 @@
   version = "v2.7.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
+
+[[projects]]
   name = "github.com/quoeamaster/CFactor"
   packages = ["TOML"]
   revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
   version = "v0.1.2"
+
+[[projects]]
+  name = "gopkg.in/linkedin/goavro.v2"
+  packages = ["."]
+  revision = "fa8f6a30176ce945e115db0afad95ede93725eec"
+  version = "v2.3.0"
 
 [[projects]]
   name = "gopkg.in/urfave/cli.v1"
@@ -25,6 +37,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "716baa980730b0a20ea9d1c811cc2ffb84bc6af328153decafe27f22551dca24"
+  inputs-digest = "7e325caf6215d5055b9f0d5f8997688af4f3e709ac992458b870ddaee36afe98"
   solver-name = "gps-cdcl"
   solver-version = 1

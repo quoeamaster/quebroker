@@ -62,6 +62,11 @@ type BrokerConfig struct {
     // the broker's accessible address (communicate with clients or
     // other Brokers within the cluster), format is host|ip:portNo
     BrokerCommunicationAddress string `toml:"broker.communication.address"`
+
+    // cluster name
+    ClusterName string `toml:"cluster.name"`
+    // "simple" cluster discovery's seed list of broker address(s)
+    ClusterDiscoverySimpleSeeds []string `toml:"cluster.discovery.simple.seeds"`
 }
 
 // a must provided lifecyclehook method
@@ -80,6 +85,9 @@ func (o *BrokerConfig) String() string {
     buf.WriteString(fmt.Sprintf("%v => %v\n\n", "* CONFIG FILE PATH", o.path))
 
     //buf.WriteString(fmt.Sprintf("%v %80s", "broker.name", "= " + o.BrokerName))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "cluster.name", o.ClusterName))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "cluster.discovery.simple.seeds", o.ClusterDiscoverySimpleSeeds))
+
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.name", o.BrokerName))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.communication.address", o.BrokerCommunicationAddress))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.path", o.LogFolder))

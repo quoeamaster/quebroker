@@ -59,6 +59,9 @@ type Broker struct {
 
     // logger for the Broker
     logger *queutil.FlexLogger
+
+    // cluster status service
+    clusterStatusSrv *ClusterStatusService
 }
 
 // TODO: test singleton feature (really per routine is a singleton???)
@@ -99,6 +102,9 @@ func newBroker(configPath string) (*Broker, error) {
 
     // set logger
     m.GetFlexLogger()
+
+    // set clusterStatus service
+    m.clusterStatusSrv = NewClusterStatusService()
 
     return m, nil
 }
@@ -141,6 +147,9 @@ func (b *Broker) StartBroker() error {
     // a) start the routine to listen for exit signals
     go b.listenToExitSequences()
     l.Debug([]byte("exit sequence hooks added.\n"))
+
+    // a2) load cluster status information
+    b.clusterStatusSrv.LoadClusterStates()
 
 // TODO: add more modules (modules = rest API)
     // b) add api modules
