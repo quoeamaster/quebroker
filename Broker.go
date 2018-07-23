@@ -155,6 +155,8 @@ func (b *Broker) StartBroker() error {
     // b) add api modules
     b.webserver.Add(NewStatsApiModule())
     l.Info([]byte("[modules - stats] added.\n"))
+    b.webserver.Add(NewClusterStatusApiModule())
+    l.Info([]byte("[modules - cluster status] added.\n"))
 
     // c) rename broker.id => broker.id.lock and LOCK the file as well
     err := queutil.RenameFile(brokerIdFile, brokerIdLockFile, 0444)
@@ -210,12 +212,17 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
     }
     err = queutil.UnlockFile(lockFilePath)
     if err != nil {
-        fmt.Printf("trying to unlock [%v] but got exception => [%v]\n", lockFilePath, err)
+        b.logger.Err([]byte(fmt.Sprintf("trying to unlock [%v] but got exception => [%v]\n", lockFilePath, err)))
         return err
     }
     l.Debug([]byte("released broker.id.lock -> broker.id\n"))
 
-// TODO: final updates on cluster status
+    // final updates on cluster status
+    err = b.clusterStatusSrv.Release(nil)
+    if err != nil {
+        b.logger.Err([]byte(err.Error() + "\n"))
+        return err
+    }
 
     l.Info([]byte("release resource(s) sequence [DONE]\n"))
     return nil
