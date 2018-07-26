@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7b9ce9e0-3b70-4e7e-a710-2a9c3ee5b2cc" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ClusterStatus.go" beforeDir="false" afterPath="$PROJECT_DIR$/ClusterStatus.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Broker.go" beforeDir="false" afterPath="$PROJECT_DIR$/Broker.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -24,11 +22,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Broker.go" pinned="false" current-in-tab="false">
+      <file leaf-file-name="Broker.go" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/Broker.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1916">
-              <caret line="146" column="54" selection-start-line="146" selection-start-column="54" selection-end-line="146" selection-end-column="54" />
+            <state relative-caret-position="145">
+              <caret line="233" column="69" selection-start-line="233" selection-start-column="69" selection-end-line="233" selection-end-column="69" />
             </state>
           </provider>
         </entry>
@@ -36,7 +34,7 @@
       <file leaf-file-name="BrokerConfig.go" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/BrokerConfig.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1215">
+            <state relative-caret-position="487">
               <caret line="89" selection-start-line="89" selection-end-line="89" />
               <folding>
                 <element signature="n#!!block;n#NewBrokerConfig#0" />
@@ -45,11 +43,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="true">
+      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="326">
-              <caret line="149" column="5" selection-start-line="149" selection-start-column="5" selection-end-line="149" selection-end-column="5" />
+            <state relative-caret-position="430">
+              <caret line="155" column="72" selection-start-line="155" selection-start-column="72" selection-end-line="155" selection-end-column="72" />
             </state>
           </provider>
         </entry>
@@ -90,6 +88,8 @@
       <find>appendFileToWD</find>
       <find>value</find>
       <find>cluster_</find>
+      <find>release</find>
+      <find>releas</find>
     </findStrings>
   </component>
   <component name="GOROOT" path="/usr/local/Cellar/go/1.10.2/libexec" />
@@ -105,8 +105,8 @@
         <option value="$PROJECT_DIR$/ApiStats.go" />
         <option value="$PROJECT_DIR$/BrokerConfig.go" />
         <option value="$PROJECT_DIR$/ApiClusterStatus.go" />
-        <option value="$PROJECT_DIR$/Broker.go" />
         <option value="$PROJECT_DIR$/ClusterStatus.go" />
+        <option value="$PROJECT_DIR$/Broker.go" />
       </list>
     </option>
   </component>
@@ -410,9 +410,16 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="430">
+          <caret line="155" column="72" selection-start-line="155" selection-start-column="72" selection-end-line="155" selection-end-column="72" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/BrokerConfig.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1215">
+        <state relative-caret-position="487">
           <caret line="89" selection-start-line="89" selection-end-line="89" />
           <folding>
             <element signature="n#!!block;n#NewBrokerConfig#0" />
@@ -422,15 +429,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/Broker.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1916">
-          <caret line="146" column="54" selection-start-line="146" selection-start-column="54" selection-end-line="146" selection-end-column="54" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="326">
-          <caret line="149" column="5" selection-start-line="149" selection-start-column="5" selection-end-line="149" selection-end-column="5" />
+        <state relative-caret-position="145">
+          <caret line="233" column="69" selection-start-line="233" selection-start-column="69" selection-end-line="233" selection-end-column="69" />
         </state>
       </provider>
     </entry>

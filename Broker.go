@@ -231,7 +231,8 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
 // method to listen to lifecycle hooks based on signal-term or signal-interrupt
 func (b *Broker) listenToExitSequences() {
     signalChannel := make(chan os.Signal, 1)
-    signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+    // however "kill -9 pid" is not caught-able by golang... weird...
+    signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 
     sig := <- signalChannel
     fmt.Println("sig received =>", sig)
