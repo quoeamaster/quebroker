@@ -144,6 +144,14 @@ func (s *ClusterStatusService) initialClusterStatusWrite () error {
     b := GetBroker("")
     stateFilepath := s.getClusterStatusFilepath()
 
+    // extract the folder part
+    fileIdx := strings.Index(stateFilepath, ".cluster_status")
+    // create the folder hierarchy
+    _, err := queutil.IsDirExists(stateFilepath[0:fileIdx], true)
+    if err != nil {
+        return err
+    }
+
     s.persistableClusterStatusMap["version"] = 1
     s.persistableClusterStatusMap["cluster_name"] = b.config.ClusterName
     s.persistableClusterStatusMap["status_list"] = make([]map[string]interface{}, 0)

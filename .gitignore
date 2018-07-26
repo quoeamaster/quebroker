@@ -19,3 +19,7 @@ quebroker
 
 # ignore the "broker.id" file as well (generate for the 1st time and re-use)
 broker.id
+
+# ignore script folder
+script/*
+
