@@ -27,6 +27,7 @@ import (
     "net/http"
     "strings"
     "runtime"
+    "path"
 )
 
 // when the broker is not yet started up; this file indicated the broker's UUID
@@ -120,8 +121,11 @@ func newBroker(configPath string) (*Broker, error) {
 //  3) error => any error occurred
 func (b *Broker) getBrokerUUID() (bool, string, error) {
     // check if broker.id.lock or broker.id file is there or not
-    if queutil.IsFileExists(brokerIdFile) == true {
-        uuidByteArr, err := queutil.ReadFileContent(brokerIdFile)
+    // TODO: broker.id should be located under the "data" folder
+    brokerIdPath := path.Join(b.config.DataFolder, brokerIdFile)
+
+    if queutil.IsFileExists(brokerIdPath) == true {
+        uuidByteArr, err := queutil.ReadFileContent(brokerIdPath)
         if err != nil {
             return false, "", err
         }
@@ -130,7 +134,7 @@ func (b *Broker) getBrokerUUID() (bool, string, error) {
     } else {
         // assume no broker UUID (first time starting up the broker)
         uuid := queutil.GenerateUUID()
-        err := queutil.WriteStringToFile(brokerIdFile, uuid)
+        err := queutil.WriteStringToFile(brokerIdPath, uuid)
         if err != nil {
             return false, "", err
         }
@@ -159,17 +163,15 @@ func (b *Broker) StartBroker() error {
     l.Info([]byte("[modules - cluster status] added.\n"))
 
     // c) rename broker.id => broker.id.lock and LOCK the file as well
-    err := queutil.RenameFile(brokerIdFile, brokerIdLockFile, 0444)
+    finalBrokerIdFile := path.Join(b.config.DataFolder, brokerIdFile)
+    finalBrokerIdLockFile := path.Join(b.config.DataFolder, brokerIdLockFile)
+    err := queutil.RenameFile(finalBrokerIdFile, finalBrokerIdLockFile, 0444)
     if err != nil {
         return err
     }
-    lockFilePath, err := b.appendFileToWD(brokerIdLockFile)
+    err = queutil.LockFile(finalBrokerIdLockFile)
     if err != nil {
-        return err
-    }
-    err = queutil.LockFile(lockFilePath)
-    if err != nil {
-        fmt.Printf("trying to lock [%v]\n", lockFilePath)
+        fmt.Printf("trying to lock [%v]\n", finalBrokerIdLockFile)
         return err
     }
     l.Debug([]byte("locking broker.id file -> broker.id.lock\n"))
@@ -202,17 +204,15 @@ func (b *Broker) Release(optionalParams map[string]interface{}) error {
     l := b.logger
     l.Info([]byte("release resource(s) sequence [ACTIVATE]...\n"))
 
-    err := queutil.RenameFile(brokerIdLockFile, brokerIdFile, 0444)
+    finalBrokerIdLockFile := path.Join(b.config.DataFolder, brokerIdLockFile)
+    finalBrokerIdFile := path.Join(b.config.DataFolder, brokerIdFile)
+    err := queutil.RenameFile(finalBrokerIdLockFile, finalBrokerIdFile, 0444)
     if err != nil {
         return err
     }
-    lockFilePath, err := b.appendFileToWD(brokerIdFile)
+    err = queutil.UnlockFile(finalBrokerIdFile)
     if err != nil {
-        return err
-    }
-    err = queutil.UnlockFile(lockFilePath)
-    if err != nil {
-        b.logger.Err([]byte(fmt.Sprintf("trying to unlock [%v] but got exception => [%v]\n", lockFilePath, err)))
+        b.logger.Err([]byte(fmt.Sprintf("trying to unlock [%v] but got exception => [%v]\n", finalBrokerIdFile, err)))
         return err
     }
     l.Debug([]byte("released broker.id.lock -> broker.id\n"))
