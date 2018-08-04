@@ -1,6 +1,9 @@
 package main
 
-import "github.com/emicklei/go-restful"
+import (
+    "github.com/emicklei/go-restful"
+    "fmt"
+)
 
 func NewClusterStatusApiModule () *restful.WebService {
     srv := new(restful.WebService)
@@ -12,6 +15,8 @@ func NewClusterStatusApiModule () *restful.WebService {
     srv.Route(srv.GET("/").To(getOverallClusterStatus))
     srv.Route(srv.GET("/sync").To(syncClusterStatus))
     srv.Route(srv.GET("/mastersync").To(requestClusterStatusFromMaster))
+
+    srv.Route(srv.POST("/_startMasterElection").To(startMasterElection))
 
     return srv
 }
@@ -31,5 +36,11 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
 
 // request a sync for cluster status with the Master broker in the cluster
 func requestClusterStatusFromMaster (req *restful.Request, res *restful.Response) {
+
+}
+
+func startMasterElection (req *restful.Request, res *restful.Response) {
+    fmt.Println(req.Request.Header)
+
 
 }

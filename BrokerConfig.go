@@ -18,7 +18,7 @@ package main
 
 import (
     "github.com/quoeamaster/CFactor/TOML"
-    "queutil"
+    "github.com/quoeamaster/queutil"
     "strings"
     "runtime"
     "fmt"
@@ -67,6 +67,11 @@ type BrokerConfig struct {
     ClusterName string `toml:"cluster.name"`
     // "simple" cluster discovery's seed list of broker address(s)
     ClusterDiscoverySimpleSeeds []string `toml:"cluster.discovery.simple.seeds"`
+
+    // ** role type config **
+
+    // is this Broker is "master-ready"
+    RoleMasterReady string `toml:"role.master"`
 }
 
 // a must provided lifecyclehook method
@@ -95,6 +100,8 @@ func (o *BrokerConfig) String() string {
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.max.size.mb", o.LogMaxFileSizeInMb))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "log.level", o.LogLevel))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "data.path", o.DataFolder))
+
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "role.master", o.RoleMasterReady))
 
 
     buf.WriteString("\n")

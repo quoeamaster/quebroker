@@ -4,7 +4,7 @@ import (
     "path/filepath"
     "os"
     "gopkg.in/linkedin/goavro.v2"
-    "queutil"
+    "github.com/quoeamaster/queutil"
     "fmt"
     "reflect"
     "strings"

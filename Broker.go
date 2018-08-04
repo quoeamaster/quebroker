@@ -17,17 +17,18 @@
 package main
 
 import (
-    "queutil"
+    "github.com/quoeamaster/queutil"
     "github.com/emicklei/go-restful"
     "os"
     "os/signal"
     "syscall"
     "fmt"
     "sync"
-    "net/http"
     "strings"
     "runtime"
     "path"
+    "github.com/quoeamaster/queplugin"
+    "net/http"
 )
 
 // when the broker is not yet started up; this file indicated the broker's UUID
@@ -63,6 +64,12 @@ type Broker struct {
 
     // cluster status service
     clusterStatusSrv *ClusterStatusService
+
+    // is this Broker instance the MASTER (can update cluster status)
+    isMaster bool
+
+    // the implementation of the discovery plugin
+    discoveryPlugin *queplugin.DiscoveryPlugin
 }
 
 // TODO: test singleton feature (really per routine is a singleton???)
@@ -107,7 +114,64 @@ func newBroker(configPath string) (*Broker, error) {
     // set clusterStatus service
     m.clusterStatusSrv = NewClusterStatusService()
 
+    // wait till an election has been done; then this broker instance could
+    // become a Master or not
+    m.isMaster = false
+
     return m, nil
+}
+
+// method to start the broker instance
+func (b *Broker) StartBroker() error {
+    // TODO bootstrap logs
+    l := b.logger
+    l.Info([]byte("initializing...\n"))
+
+    // a) start the routine to listen for exit signals
+    go b.listenToExitSequences()
+    l.Debug([]byte("exit sequence hooks added.\n"))
+
+    // a2) load cluster status information
+    b.clusterStatusSrv.LoadClusterStatus()
+
+    // TODO: add more modules (modules = rest API)
+    // b) add api modules
+    b.webserver.Add(NewStatsApiModule())
+    l.Info([]byte("[modules - stats] added.\n"))
+    b.webserver.Add(NewClusterStatusApiModule())
+    l.Info([]byte("[modules - cluster status] added.\n"))
+
+    // c) rename broker.id => broker.id.lock and LOCK the file as well
+    finalBrokerIdFile := path.Join(b.config.DataFolder, brokerIdFile)
+    finalBrokerIdLockFile := path.Join(b.config.DataFolder, brokerIdLockFile)
+    err := queutil.RenameFile(finalBrokerIdFile, finalBrokerIdLockFile, 0444)
+    if err != nil {
+        return err
+    }
+    err = queutil.LockFile(finalBrokerIdLockFile)
+    if err != nil {
+        fmt.Printf("trying to lock [%v]\n", finalBrokerIdLockFile)
+        return err
+    }
+    l.Debug([]byte("locking broker.id file -> broker.id.lock\n"))
+
+    // create the correct DiscoveryPlugin instance then ...
+
+
+    // sniff for valid seed list members, then trigger Master election
+
+
+    // d) start the http server
+    return http.ListenAndServe(b.config.BrokerCommunicationAddress, b.webserver)
+}
+
+
+
+// TODO: sniffing should be extracted out a plugin(s) since different OS or
+// TODO: hosting environment would have different ways to sniff members + plus Master election
+
+func (b *Broker) sniffSeedMembers () {
+
 }
 
 // return the broker's UUID. 2 situations arise:
@@ -142,46 +206,10 @@ func (b *Broker) getBrokerUUID() (bool, string, error) {
     }
 }
 
-// method to start the broker instance
-func (b *Broker) StartBroker() error {
-    // TODO bootstrap logs
-    l := b.logger
-    l.Info([]byte("initializing...\n"))
-
-    // a) start the routine to listen for exit signals
-    go b.listenToExitSequences()
-    l.Debug([]byte("exit sequence hooks added.\n"))
-
-    // a2) load cluster status information
-    b.clusterStatusSrv.LoadClusterStatus()
-
-// TODO: add more modules (modules = rest API)
-    // b) add api modules
-    b.webserver.Add(NewStatsApiModule())
-    l.Info([]byte("[modules - stats] added.\n"))
-    b.webserver.Add(NewClusterStatusApiModule())
-    l.Info([]byte("[modules - cluster status] added.\n"))
-
-    // c) rename broker.id => broker.id.lock and LOCK the file as well
-    finalBrokerIdFile := path.Join(b.config.DataFolder, brokerIdFile)
-    finalBrokerIdLockFile := path.Join(b.config.DataFolder, brokerIdLockFile)
-    err := queutil.RenameFile(finalBrokerIdFile, finalBrokerIdLockFile, 0444)
-    if err != nil {
-        return err
-    }
-    err = queutil.LockFile(finalBrokerIdLockFile)
-    if err != nil {
-        fmt.Printf("trying to lock [%v]\n", finalBrokerIdLockFile)
-        return err
-    }
-    l.Debug([]byte("locking broker.id file -> broker.id.lock\n"))
-
-
-    // d) start the http server
-    return http.ListenAndServe(b.config.BrokerCommunicationAddress, b.webserver)
-}
-
 func (b *Broker) getPathSeparator() string {
+    // PS. in actual, if using path.Join api; then the correct path separator
+    // would be appended automatically; hence this method might be obsolete
+    // in the future
     slash := "/"
     if strings.Compare(runtime.GOOS, "windows") == 0 {
         slash = "\\"
@@ -190,12 +218,13 @@ func (b *Broker) getPathSeparator() string {
 }
 
 func (b *Broker) appendFileToWD(file string) (string, error) {
-    slash := b.getPathSeparator()
-    path, err := os.Getwd()
+    workDir, err := os.Getwd()
     if err != nil {
         return "", err
     }
-    return fmt.Sprintf("%v%v%v", path, slash, file), nil
+    return path.Join(workDir, file), nil
+    // slash := b.getPathSeparator()
+    // return fmt.Sprintf("%v%v%v", workDir, slash, file), nil
 }
 
 // resource(s) to be released before stopping the broker
