@@ -23,19 +23,12 @@ func NewNetworkApiModule () *restful.WebService {
 // curl -XPOST localhost:10030/_network/_handshake -H 'Content-Type: application/json' -d '{"key1":"value1", "key2":"value2"}'
 
 func handshake (req *restful.Request, res *restful.Response) {
-
-    iContentLen := int(req.Request.ContentLength)
-
-    if iContentLen > 0 {
-        bArr := make([]byte, req.Request.ContentLength)
-        _, err := req.Request.Body.Read(bArr)
-        if !queutil.IsHttpRequestValidEOFError(err, int(req.Request.ContentLength)) {
-            panic(err)
-        }
-        fmt.Println("* data from request =>", string(bArr))
-        req.Request.Body.Close()
+    bArr, err := queutil.GetHttpRequestContent(req.Request)
+    if err != nil {
+        panic(err)
     }
-
+    fmt.Println (string(bArr))
+    req.Request.Body.Close()
 }
 
 

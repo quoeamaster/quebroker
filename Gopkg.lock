@@ -7,8 +7,8 @@
     ".",
     "log"
   ]
-  revision = "3658237ded108b4134956c1b3050349d93e7b895"
-  version = "v2.7.1"
+  revision = "3eb9738c1697594ea6e71a7156a9bb32ed216cf0"
+  version = "v2.8.0"
 
 [[projects]]
   branch = "master"
@@ -17,28 +17,46 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  name = "github.com/json-iterator/go"
+  packages = ["."]
+  revision = "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
+  version = "1.1.4"
+
+[[projects]]
   branch = "master"
   name = "github.com/kjk/betterguid"
   packages = ["."]
   revision = "c442874ba63a7beb6c8b6f14ad1675de747b7f71"
 
 [[projects]]
-  branch = "master"
+  name = "github.com/modern-go/concurrent"
+  packages = ["."]
+  revision = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
+  version = "1.0.3"
+
+[[projects]]
+  name = "github.com/modern-go/reflect2"
+  packages = ["."]
+  revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
+  version = "1.0.1"
+
+[[projects]]
   name = "github.com/quoeamaster/CFactor"
   packages = ["TOML"]
   revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
+  version = "v0.1.2"
 
 [[projects]]
   branch = "master"
   name = "github.com/quoeamaster/queplugin"
   packages = ["."]
-  revision = "8289aae3e9aaa9fcd036f4a058cf01583adbc7d1"
+  revision = "8fa2a18641ab460acc7f1ed9213c88c8f436da8d"
 
 [[projects]]
   branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "c293ce2d270f730012ef65c97dd50ca28adf8898"
+  revision = "97f4d90f24fd8a6de9986dcbe2d029f622ff64e1"
 
 [[projects]]
   name = "github.com/theckman/go-flock"
