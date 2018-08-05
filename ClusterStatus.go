@@ -4,11 +4,11 @@ import (
     "path/filepath"
     "os"
     "gopkg.in/linkedin/goavro.v2"
-    "github.com/quoeamaster/queutil"
     "fmt"
     "reflect"
     "strings"
     "bytes"
+    "github.com/quoeamaster/queutil"
 )
 
 // avro schema for cluster-status

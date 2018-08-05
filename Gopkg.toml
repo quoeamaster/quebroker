@@ -29,6 +29,11 @@
   name = "github.com/emicklei/go-restful"
   version = "2.7.1"
 
+
+[[constraint]]
+  name = "github.com/quoeamaster/queutil"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true

@@ -23,10 +23,10 @@
   revision = "c442874ba63a7beb6c8b6f14ad1675de747b7f71"
 
 [[projects]]
+  branch = "master"
   name = "github.com/quoeamaster/CFactor"
   packages = ["TOML"]
   revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
-  version = "v0.1.2"
 
 [[projects]]
   branch = "master"
@@ -35,10 +35,10 @@
   revision = "8289aae3e9aaa9fcd036f4a058cf01583adbc7d1"
 
 [[projects]]
+  branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "2251edb8a6cda7c43353453abf324ded0ecc0fb1"
-  version = "v0.1.2"
+  revision = "c293ce2d270f730012ef65c97dd50ca28adf8898"
 
 [[projects]]
   name = "github.com/theckman/go-flock"
@@ -67,6 +67,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1d386d10e9c11e4df943d4b3f57b7eafbba4686ea22c6db4ca94284faa10217b"
+  inputs-digest = "52e018952954b63576e7762c37e805f5163f6320c19e64d4e1d6b456161c357a"
   solver-name = "gps-cdcl"
   solver-version = 1

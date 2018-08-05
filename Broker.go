@@ -136,6 +136,8 @@ func (b *Broker) StartBroker() error {
 
     // TODO: add more modules (modules = rest API)
     // b) add api modules
+    b.webserver.Add(NewNetworkApiModule())
+    l.Info([]byte("[modules - network status] added.\n"))
     b.webserver.Add(NewStatsApiModule())
     l.Info([]byte("[modules - stats] added.\n"))
     b.webserver.Add(NewClusterStatusApiModule())
