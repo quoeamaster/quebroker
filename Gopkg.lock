@@ -19,8 +19,8 @@
 [[projects]]
   name = "github.com/json-iterator/go"
   packages = ["."]
-  revision = "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
-  version = "1.1.4"
+  revision = "1624edc4454b8682399def8740d46db5e4362ba4"
+  version = "1.1.5"
 
 [[projects]]
   branch = "master"
@@ -41,22 +41,26 @@
   version = "1.0.1"
 
 [[projects]]
+  branch = "master"
   name = "github.com/quoeamaster/CFactor"
-  packages = ["TOML"]
-  revision = "88dc6f6b3836d6b1071dcf96dc4d1297af6ee3cf"
-  version = "v0.1.2"
+  packages = [
+    "TOML",
+    "common",
+    "interfaces"
+  ]
+  revision = "e09ebfd9cf4047a45b73942cf411b9ffe6b50745"
 
 [[projects]]
   branch = "master"
   name = "github.com/quoeamaster/queplugin"
   packages = ["."]
-  revision = "8fa2a18641ab460acc7f1ed9213c88c8f436da8d"
+  revision = "7d52b401237a73db4556988ef009ca482e94a89c"
 
 [[projects]]
   branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "97f4d90f24fd8a6de9986dcbe2d029f622ff64e1"
+  revision = "c29301b23583d364c9827c44922cdc0f127fb052"
 
 [[projects]]
   name = "github.com/theckman/go-flock"
@@ -85,6 +89,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "52e018952954b63576e7762c37e805f5163f6320c19e64d4e1d6b456161c357a"
+  inputs-digest = "04c7dc4f7fe9123b661146ac67744aa690a3f7d3660b9f43700411df374dc125"
   solver-name = "gps-cdcl"
   solver-version = 1

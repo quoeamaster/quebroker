@@ -29,6 +29,7 @@ import (
     "path"
     "github.com/quoeamaster/queplugin"
     "net/http"
+    "time"
 )
 
 // when the broker is not yet started up; this file indicated the broker's UUID
@@ -69,7 +70,10 @@ type Broker struct {
     isMaster bool
 
     // the implementation of the discovery plugin
-    discoveryPlugin *queplugin.DiscoveryPlugin
+    discoveryPlugin queplugin.DiscoveryPlugin
+
+    // channel for clusterJoin related activities (int is used to save network overhead)
+    clusterJoinChannel chan int
 }
 
 // TODO: test singleton feature (really per routine is a singleton???)
@@ -118,6 +122,9 @@ func newBroker(configPath string) (*Broker, error) {
     // become a Master or not
     m.isMaster = false
 
+    // init the channel ready for cluster join / create activities
+    m.clusterJoinChannel = make(chan int, 1)
+
     return m, nil
 }
 
@@ -158,7 +165,9 @@ func (b *Broker) StartBroker() error {
     l.Debug([]byte("locking broker.id file -> broker.id.lock\n"))
 
     // create the correct DiscoveryPlugin instance then ...
-
+    b.discoveryPlugin = b.createDiscoveryModuleByModuleName(b.config.DiscoveryModuleName)
+    go b.createOrJoinCluster()
+    b.clusterJoinChannel <- ChanSignalCreateOrJoinCluster
 
     // sniff for valid seed list members, then trigger Master election
 
@@ -167,7 +176,41 @@ func (b *Broker) StartBroker() error {
     return http.ListenAndServe(b.config.BrokerCommunicationAddress, b.webserver)
 }
 
+// method to create the correct DiscoveryPlugin implementation based on
+// moduleName. This method would panic if the provided moduleName is not
+// recognized.
+func (b *Broker) createDiscoveryModuleByModuleName (moduleName string) queplugin.DiscoveryPlugin {
+    switch moduleName {
+    case "simple":
+        return NewSimpleDiscoveryPlugin()
+    default:
+        panic(fmt.Errorf("could not create the DiscoveryPlugin as type [%v] is unknown", moduleName))
+    }
+}
 
+func (b *Broker) createOrJoinCluster () {
+    b.logger.Debug([]byte("** inside createOrJoinCluster routine"))
+
+    iSignal := <- b.clusterJoinChannel
+    switch iSignal {
+    case ChanSignalCreateOrJoinCluster:
+        // force to sleep for 1000 ms
+        // (sort of throttle to keep the broker less busy during startup)
+        time.Sleep(time.Millisecond * 1000)
+
+        optionMap := make(map[string]interface{})
+        optionMap[KeyDiscoveryClusterName]  = b.config.ClusterName
+        optionMap[KeyDiscoverySeedList]     = b.config.ClusterDiscoverySimpleSeeds
+        optionMap[KeyDiscoveryLogger]       = b.logger
+
+        valid, returnMap, err := b.discoveryPlugin.Ping("", optionMap)
+        b.logger.Info([]byte(fmt.Sprintf("valid? %v; error => %v\nreturnMap => %v", valid, err, returnMap)))
+
+    default:
+        // TODO: should it panic???
+        b.logger.Warn([]byte(fmt.Sprintf("unknown signal received on the 'clusterJoinChannel' => %v\n", iSignal)))
+    }
+}
 
 // TODO: sniffing should be extracted out a plugin(s) since different OS or
 // TODO: hosting environment would have different ways to sniff members + plus Master election

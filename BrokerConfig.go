@@ -26,17 +26,6 @@ import (
     "bytes"
 )
 
-// environment variable pointing to the path of the que broker config file
-const envVarBrokerConfigPath = "QUE_BROKER_CONFIG_PATH"
-
-// the path containing the config files under the current user's home directory
-const homeDirectoryConfigDir = ".que"
-
-// local broker config file (the relative path)
-const localBrokerConfigPath = "queBroker.toml"
-
-
-
 
 type BrokerConfig struct {
     // path of the config file
@@ -65,6 +54,9 @@ type BrokerConfig struct {
 
     // cluster name
     ClusterName string `toml:"cluster.name"`
+
+    // cluster discovery module name (default is "simple")
+    DiscoveryModuleName string `toml:"cluster.discovery.module.name"`
     // "simple" cluster discovery's seed list of broker address(s)
     ClusterDiscoverySimpleSeeds []string `toml:"cluster.discovery.simple.seeds"`
 
@@ -72,6 +64,11 @@ type BrokerConfig struct {
 
     // is this Broker is "master-ready"
     RoleMasterReady string `toml:"role.master"`
+
+
+    // ** security related (actual operations handled by a plugin later on ~ x-pack in ES) **
+
+    SecurityScheme string `toml:"security.scheme.name"`
 }
 
 // a must provided lifecyclehook method
@@ -91,6 +88,7 @@ func (o *BrokerConfig) String() string {
 
     //buf.WriteString(fmt.Sprintf("%v %80s", "broker.name", "= " + o.BrokerName))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "cluster.name", o.ClusterName))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "cluster.discovery.module.name", o.DiscoveryModuleName))
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "cluster.discovery.simple.seeds", o.ClusterDiscoverySimpleSeeds))
 
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "broker.name", o.BrokerName))
@@ -102,6 +100,11 @@ func (o *BrokerConfig) String() string {
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "data.path", o.DataFolder))
 
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "role.master", o.RoleMasterReady))
+
+    // security related setting (handled by a security plugin)
+    if !queutil.IsStringEmpty(o.SecurityScheme) {
+        buf.WriteString(fmt.Sprintf("%-30v = %v\n", "security.scheme.name", o.SecurityScheme))
+    }
 
 
     buf.WriteString("\n")
