@@ -60,7 +60,7 @@
   branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "c29301b23583d364c9827c44922cdc0f127fb052"
+  revision = "387ea426963e5f7480f4cf9a63627fc4c4ca1c49"
 
 [[projects]]
   name = "github.com/theckman/go-flock"

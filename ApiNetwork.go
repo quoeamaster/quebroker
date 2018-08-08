@@ -5,6 +5,8 @@ import (
     "fmt"
     "github.com/quoeamaster/queutil"
     "encoding/json"
+    "strings"
+    "bytes"
 )
 
 func NewNetworkApiModule () *restful.WebService {
@@ -34,15 +36,43 @@ func handshake (req *restful.Request, res *restful.Response) {
     if err != nil {
         panic(err)
     }
-    fmt.Println ("$$ inside handshake api =>", request.ClusterName, request.SeedIP)
-
     // get back the Broker instance
     b := GetBroker("")
-    fmt.Println ("$$ inside handshake api => broker.cluster:", b.clusterStatusSrv.memLevelClusterStatusMap)
-    fmt.Println ("$$ inside handshake api => broker.brokername:", b.config.BrokerName)
-    fmt.Println ("$$ inside handshake api => broker.isMaster:", b.isMaster)
+    if b.logger != nil {
+        b.logger.Debug([]byte(fmt.Sprintf ("[network] inside handshake api => %v, %v\n", request.ClusterName, request.SeedIP)))
+    }
 
+    response := new(NetworkHandshakeResponse)
+    if strings.Compare(b.config.ClusterName, request.ClusterName) == 0 {
+        response.CanJoin = true
+    } else {
+        response.CanJoin = false
+    }
+// TODO: update the role(s) when necessary in the future (for now only Master.Ready and Data.Ready role)
+    response.IsMasterReady = b.config.RoleMasterReady
+    response.IsDataReady = b.config.RoleDataReady
+
+    response.IsActiveMaster = b.isMaster
+
+    response.BrokerName = b.config.BrokerName
+    response.BrokerCommunicationAddr = b.config.BrokerCommunicationAddress
+    response.BrokerId = b.UUID
+
+    // close request body as already read all parameters
     req.Request.Body.Close()
+
+    // write out to the response
+    // bArr, err = json.Marshal(response)
+    if response.CanJoin {
+        err = res.WriteHeaderAndJson(200, response, restful.MIME_JSON)
+    } else {
+        // accepted (sort of ok but not the perfect situation;
+        // in this case everything fine except can't join the cluster)
+        err = res.WriteHeaderAndJson(202, response, restful.MIME_JSON)
+    }
+    if err != nil {
+        panic(err)
+    }
 }
 
 
@@ -52,8 +82,44 @@ func startMasterElection (req *restful.Request, res *restful.Response) {
 
 
 
-
+// Request => Handshake api (Network Module)
 type NetworkHandshakeRequest struct {
     ClusterName string
     SeedIP string
+}
+
+// Response => Handshake api (Network Module)
+type NetworkHandshakeResponse struct {
+    // ok to join ? (same cluster_name or not)
+    CanJoin bool
+    // roles
+    IsMasterReady bool
+    IsDataReady bool
+    // is this broker a Master already?
+    IsActiveMaster bool
+    // broker name
+    BrokerName string
+    BrokerCommunicationAddr string
+    BrokerId string
+}
+func (n *NetworkHandshakeResponse) String () string {
+    var buf bytes.Buffer
+
+    buf.WriteString("canJoin: ")
+    buf.WriteString(fmt.Sprintf("%v", n.CanJoin))
+    buf.WriteString(", isMasterReady: ")
+    buf.WriteString(fmt.Sprintf("%v", n.IsMasterReady))
+    buf.WriteString(", isDataReady: ")
+    buf.WriteString(fmt.Sprintf("%v", n.IsDataReady))
+    buf.WriteString(", isActiveMaster: ")
+    buf.WriteString(fmt.Sprintf("%v", n.IsActiveMaster))
+    buf.WriteString(", brokerName: ")
+    buf.WriteString(fmt.Sprintf("%v", n.BrokerName))
+    buf.WriteString(", brokerId: ")
+    buf.WriteString(fmt.Sprintf("%v", n.BrokerId))
+    buf.WriteString(", broker-addr: ")
+    buf.WriteString(fmt.Sprintf("%v", n.BrokerCommunicationAddr))
+    buf.WriteString("\n")
+
+    return buf.String()
 }

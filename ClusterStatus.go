@@ -9,6 +9,7 @@ import (
     "strings"
     "bytes"
     "github.com/quoeamaster/queutil"
+    "time"
 )
 
 // avro schema for cluster-status
@@ -35,6 +36,15 @@ const clusterStatusAvroSchema = `{
         }
     ]
 }`
+
+// struct to encapsulate the details of the current / active master broker
+type ActiveMaster struct {
+    BrokerId string
+    BrokerName string
+    BrokerCommunicationAddr string
+    // since when did this active-master started to serve
+    Since time.Time
+}
 
 // a service object for manipulating ClusterStatus
 type ClusterStatusService struct {
@@ -72,6 +82,35 @@ func NewClusterStatusService () *ClusterStatusService {
     m.memLevelClusterStatusMap = make(map[string]interface{})
 
     return m
+}
+
+// return the active-master broker information if any.
+// There are cases when the cluster is still forming and hence no master broker yet.
+// Also cluster might be formed however, the quorum number of master-ready
+//  brokers are not available yet hence no master broker available
+func (s *ClusterStatusService) GetActiveMaster () (activeMaster *ActiveMaster, err error) {
+    err = nil
+    activeMaster = nil
+    isMasterAvailable := false
+    // broker id
+    if val := s.memLevelClusterStatusMap[keyClusterActiveMasterId]; val != nil {
+        isMasterAvailable = true
+        activeMaster = new(ActiveMaster)
+        activeMaster.BrokerId = val.(string)
+    }
+    // if broker id exists, the other information should be there as well
+    if isMasterAvailable {
+        if val := s.memLevelClusterStatusMap[keyClusterActiveMasterName]; val != nil {
+            activeMaster.BrokerName = val.(string)
+        }
+        if val := s.memLevelClusterStatusMap[keyClusterActiveMasterAddr]; val != nil {
+            activeMaster.BrokerCommunicationAddr = val.(string)
+        }
+        if val := s.memLevelClusterStatusMap[keyClusterActiveMasterSince]; val != nil {
+            activeMaster.Since = val.(time.Time)
+        }
+    }
+    return activeMaster, err
 }
 
 // load back the persisted cluster status (if any)
@@ -212,7 +251,7 @@ func (s *ClusterStatusService) MergeClusterStatus (
     var buf bytes.Buffer
     numMerges := 0
 
-    buf.WriteString("cluster status (in-memory) merged by the following keys: ")
+    buf.WriteString("[cluster_status] cluster status (in-memory) merged by the following keys: ")
 
     if memClusterStatusMap != nil {
         for key, value := range memClusterStatusMap {
@@ -243,7 +282,12 @@ func (s *ClusterStatusService) MergeClusterStatus (
     }
     buf.WriteString(".\n")
     // log [info]
+// TODO: to debug later on
     GetBroker("").logger.Info(buf.Bytes())
+
+    // debug
+    GetBroker("").logger.Debug([]byte(fmt.Sprintf("[cluster_status] %v\n", s.memLevelClusterStatusMap)))
+    GetBroker("").logger.Debug([]byte(fmt.Sprintf("[cluster_status] %v\n", s.persistableClusterStatusMap)))
 
     return nil
 }
@@ -277,3 +321,39 @@ func (s *ClusterStatusService) Release(optionalParam map[string]interface{}) err
 
     return nil
 }
+
+
+// struct for cluster mem level reference
+type BrokerSeed struct {
+    UUID string
+    Name string
+    Addr string
+    RoleMaster bool
+    RoleData bool
+}
+func (b *BrokerSeed) String () string {
+    var buf bytes.Buffer
+
+    buf = queutil.BeginJsonStructure(buf)
+    buf = queutil.AddStringToJsonStructure(buf, "BrokerId", b.UUID)
+    buf = queutil.AddStringToJsonStructure(buf, "BrokerName", b.Name)
+    buf = queutil.AddStringToJsonStructure(buf, "BrokerCommunicationAddr", b.Addr)
+    buf = queutil.AddBoolToJsonStructure(buf, "RoleMaster", b.RoleMaster)
+    buf = queutil.AddBoolToJsonStructure(buf, "RoleData", b.RoleData)
+    buf = queutil.EndJsonStructure(buf)
+
+    return buf.String()
+}
+func NewBrokerSeed(uuid, name, addr string, master, data bool) BrokerSeed {
+    b := new(BrokerSeed)
+
+    b.UUID = uuid
+    b.Name = name
+    b.Addr = addr
+    b.RoleMaster = master
+    b.RoleData = data
+
+    return *b
+}
+
+

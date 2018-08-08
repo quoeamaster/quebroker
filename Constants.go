@@ -35,6 +35,8 @@ const KeyDiscoveryLogger = "KeyDiscoveryLogger"
 // value MUST be a valid string (should be denoted by a constant as well e.g. BASIC)
 const KeyDiscoverySecurityScheme = "KeyDiscoverySecurityScheme"
 
+// key representing the []byte returned from the _network/_handshake api
+const KeyDiscoveryHandshakeResponseByteArray = "KeyDiscoveryHandshakeResponseByteArray"
 
 // the signal for a channel to start create or join a cluster
 const ChanSignalCreateOrJoinCluster = 1
@@ -46,3 +48,27 @@ const ChanSignalCreateOrJoinCluster = 1
 
 // http content type => json
 const httpContentTypeJson = "application/json"
+
+
+// *******************************
+// **   cluster status related  **
+// *******************************
+
+// key indicating the active master's name
+const keyClusterActiveMasterName = "keyClusterActiveMasterName"
+// key indicating the active master's id (broker id)
+const keyClusterActiveMasterId = "keyClusterActiveMasterId"
+// key indicating the active master's communication addr
+const keyClusterActiveMasterAddr = "keyClusterActiveMasterAddr"
+// key indicating the active master's startup time
+const keyClusterActiveMasterSince = "keyClusterActiveMasterSince"
+
+const keyClusterSeedList = "keyClusterSeedList"
+
+// key indicating the event / api call is related to cluster-forming activities
+// value is either true or false.
+// PS. if the event / api is not related to this type... probably you don't need to include this information
+const keyClusterFormingEventType = "keyClusterFormingEventType"
+
+
+

@@ -63,7 +63,9 @@ type BrokerConfig struct {
     // ** role type config **
 
     // is this Broker is "master-ready"
-    RoleMasterReady string `toml:"role.master"`
+    RoleMasterReady bool `toml:"role.master"`
+    // is this Broker is "data-ready" -> storage, consumable etc
+    RoleDataReady bool `toml:"role.data"`
 
 
     // ** security related (actual operations handled by a plugin later on ~ x-pack in ES) **
@@ -100,6 +102,7 @@ func (o *BrokerConfig) String() string {
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "data.path", o.DataFolder))
 
     buf.WriteString(fmt.Sprintf("%-30v = %v\n", "role.master", o.RoleMasterReady))
+    buf.WriteString(fmt.Sprintf("%-30v = %v\n", "role.data", o.RoleDataReady))
 
     // security related setting (handled by a security plugin)
     if !queutil.IsStringEmpty(o.SecurityScheme) {

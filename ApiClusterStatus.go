@@ -12,8 +12,9 @@ func NewClusterStatusApiModule () *restful.WebService {
         Produces(restful.MIME_JSON)
     // declare the REST methods with the http verbs
     srv.Route(srv.GET("/").To(getOverallClusterStatus))
-    srv.Route(srv.GET("/sync").To(syncClusterStatus))
     srv.Route(srv.GET("/mastersync").To(requestClusterStatusFromMaster))
+
+    srv.Route(srv.POST("/sync").To(syncClusterStatus))
 
     return srv
 }
@@ -30,6 +31,8 @@ func getOverallClusterStatus (req *restful.Request, res *restful.Response) {
 func syncClusterStatus (req *restful.Request, res *restful.Response) {
 
 }
+
+
 
 // request a sync for cluster status with the Master broker in the cluster
 func requestClusterStatusFromMaster (req *restful.Request, res *restful.Response) {

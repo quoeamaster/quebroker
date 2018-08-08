@@ -5,6 +5,8 @@ import (
     "fmt"
     "net/http"
     "bytes"
+    "strings"
+    "time"
 )
 
 type SimpleDiscoveryPlugin struct {
@@ -36,7 +38,7 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
                 err = r.(error)
             default:
                 if logger != nil {
-                    logger.Err([]byte(fmt.Sprintf("failed to Ping; reason: %v", r)))
+                    logger.Err([]byte(fmt.Sprintf("[discovery] failed to Ping; reason: %v\n", r)))
                 }
                 // an unknown error; can't "hide" it
                 panic(r)
@@ -76,36 +78,67 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
     }
     restClient = queutil.GenerateHttpClient(pingTimeout, nil, nil, nil)
 
+    canBreakRetry := false
     maxRetryForAllSeeds := 2
     for idx := 0; idx < maxRetryForAllSeeds; idx++ {
+        if canBreakRetry {
+            // break the outer loop (retry loop)
+            break
+        }
+        // wait for 2 seconds before a retry to connect
+        if idx > 0 {
+            time.Sleep(time.Millisecond * 2000)
+        }
+
         for _, seed := range seedList {
+
+            // avoid pinging itself... itself MUST always be join-able (common sense)
+            if strings.Compare(url, seed) == 0 {
+                continue
+            }
+            /*
             protocol := "http://"
             if !queutil.IsStringEmpty(securityScheme) {
-                // TODO: hard-code the logic to choose http or https (in general diff security scheme might use https... instead)
                 protocol = "https://"
             }
             handshakeUrl := fmt.Sprintf("%v%v/_network/_handshake", protocol, seed)
+            */
+            handshakeUrl := queutil.BuildGenericApiUrl(seed, securityScheme, "_network/_handshake")
             bJsonBody := s.buildHandShakeJsonBody(clusterName, seed)
             // do handshake (call the corresponding broker's _network/_handshake endpoint
             res, err := restClient.Post(handshakeUrl, httpContentTypeJson, &bJsonBody)
             if err != nil {
                 // retry on the next round (give the target broker a chance)
-                // return valid, returnValues, err
                 if logger != nil {
-                    logger.Info([]byte(fmt.Sprintf("failed to connect [%v], retry again...\n", seed)))
+                    logger.Info([]byte(fmt.Sprintf("[discovery] failed to connect [%v], retry again...\n", seed)))
                 }
             } else {
-                // read the response; determine is it valid to join the cluster etc
-// TODO: logic to determine join-able or not (compare clusterName)
-fmt.Println("## response from the _handshake api =>", res)
+
+                bArr, err := queutil.GetHttpResponseContent(res)
+                if err != nil {
+                    logger.Warn([]byte(fmt.Sprintf("[discovery] failed to read the response from [%v], error => [%v]\n", seed, err.Error())))
+                    continue
+                }
+
+                // update the return values to include the []byte of the response from network/_handshake api
+                returnValues[KeyDiscoveryHandshakeResponseByteArray]  = bArr
+
+                // only 200 status is ok to join; 202 is everything is fine except can't join the cluster together
+                if res.StatusCode == 200 {
+                    canBreakRetry = true
+                }
                 // close the response as should not have any further usage...
                 res.Body.Close()
+
+                if canBreakRetry {
+                    // can break means already found 1 broker connectible
+                    valid = true
+                    // break the inner loop (seedList)
+                    break
+                }
             }   // end -- if err (valid)
         }
     }
-
-
-
     return valid, returnValues, err
 }
 
@@ -119,6 +152,7 @@ func (s *SimpleDiscoveryPlugin) buildHandShakeJsonBody (clusterName, seed string
 
     return b
 }
+
 
 func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (brokerId string, err error) {
 

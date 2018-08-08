@@ -30,6 +30,7 @@ import (
     "github.com/quoeamaster/queplugin"
     "net/http"
     "time"
+    "encoding/json"
 )
 
 // when the broker is not yet started up; this file indicated the broker's UUID
@@ -203,9 +204,61 @@ func (b *Broker) createOrJoinCluster () {
         optionMap[KeyDiscoverySeedList]     = b.config.ClusterDiscoverySimpleSeeds
         optionMap[KeyDiscoveryLogger]       = b.logger
 
-        valid, returnMap, err := b.discoveryPlugin.Ping("", optionMap)
-        b.logger.Info([]byte(fmt.Sprintf("valid? %v; error => %v\nreturnMap => %v", valid, err, returnMap)))
+        valid, returnMap, err := b.discoveryPlugin.Ping(b.config.BrokerCommunicationAddress, optionMap)
+        // valid to join cluster with the target seedList (1 of them)
+        if valid {
+            bArr := returnMap[KeyDiscoveryHandshakeResponseByteArray].([]byte)
 
+            networkHandshakeResponse := new(NetworkHandshakeResponse)
+            err = json.Unmarshal(bArr, networkHandshakeResponse)
+            if err != nil {
+                b.logger.Warn([]byte(fmt.Sprintf("[broker] failed to unmarshal data from the response of [%v], error => [%v]\n", networkHandshakeResponse.BrokerCommunicationAddr, err.Error())))
+            }
+            // can join.. hooray -> broadcast to the members (actively known online)
+            // for cluster_status update (broker list)
+            // sniffing is done after master election (not that important in general)
+            if networkHandshakeResponse.CanJoin {
+                brokersList := make([]BrokerSeed, 0)
+                // itself
+                brokersList = append(brokersList, NewBrokerSeed(
+                    b.UUID, b.config.BrokerName,
+                    b.config.BrokerCommunicationAddress,
+                    b.config.RoleMasterReady, b.config.RoleDataReady))
+                // seed
+                brokersList = append(brokersList, NewBrokerSeed(
+                    networkHandshakeResponse.BrokerId,
+                    networkHandshakeResponse.BrokerName,
+                    networkHandshakeResponse.BrokerCommunicationAddr,
+                    networkHandshakeResponse.IsMasterReady,
+                    networkHandshakeResponse.IsDataReady))
+
+                memMap := make(map[string]interface{})
+                memMap[keyClusterSeedList] = brokersList
+
+                err := b.clusterStatusSrv.MergeClusterStatus(memMap, nil)
+                if err != nil {
+                    // TODO: panic or just log?
+                    b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update cluster_status, reason: %v\n", memMap)))
+                }
+                // send update to the target seed as well
+
+                // TODO NEXT... election
+            }
+
+        } else {
+            b.logger.Info([]byte(fmt.Sprintf("[broker] no broker(s) in the seed list able to form a cluster; hence starting up the cluster [%v] by itself\n", b.config.ClusterName)))
+            // TODO: startup on its own
+        }
+
+/*
+                if networkHandshakeResponse.CanJoin {
+                    canBreakRetry = true
+
+// broadcast => pending_master_election : true ; member list (itself plus the active responding broker)
+// return value => success or not (sync status) plus the pending_master_election_timestamp (start of election request)
+//  the smaller request time wins and determines which side should run the election
+                }
+ */
     default:
         // TODO: should it panic???
         b.logger.Warn([]byte(fmt.Sprintf("unknown signal received on the 'clusterJoinChannel' => %v\n", iSignal)))
