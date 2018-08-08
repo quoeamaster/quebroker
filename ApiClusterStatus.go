@@ -2,6 +2,8 @@ package main
 
 import (
     "github.com/emicklei/go-restful"
+    "github.com/quoeamaster/queutil"
+    "fmt"
 )
 
 func NewClusterStatusApiModule () *restful.WebService {
@@ -29,6 +31,14 @@ func getOverallClusterStatus (req *restful.Request, res *restful.Response) {
 // in the cluster. Usually this sync operation is set by the
 // Master of the cluster.
 func syncClusterStatus (req *restful.Request, res *restful.Response) {
+    b := GetBroker("")
+    bArr, err := queutil.GetHttpRequestContent(req.Request)
+    if err != nil {
+        panic(err)
+    }
+    // deserialize... (could not use the json.unmarshal() directly...)
+    fmt.Print(b, bArr)
+
 
 }
 
@@ -37,4 +47,8 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
 // request a sync for cluster status with the Master broker in the cluster
 func requestClusterStatusFromMaster (req *restful.Request, res *restful.Response) {
 
+}
+
+type ClusterSyncRequest struct {
+    Seeds []BrokerSeed
 }

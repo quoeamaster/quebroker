@@ -96,13 +96,6 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
             if strings.Compare(url, seed) == 0 {
                 continue
             }
-            /*
-            protocol := "http://"
-            if !queutil.IsStringEmpty(securityScheme) {
-                protocol = "https://"
-            }
-            handshakeUrl := fmt.Sprintf("%v%v/_network/_handshake", protocol, seed)
-            */
             handshakeUrl := queutil.BuildGenericApiUrl(seed, securityScheme, "_network/_handshake")
             bJsonBody := s.buildHandShakeJsonBody(clusterName, seed)
             // do handshake (call the corresponding broker's _network/_handshake endpoint

@@ -62,7 +62,7 @@ const keyClusterActiveMasterId = "keyClusterActiveMasterId"
 const keyClusterActiveMasterAddr = "keyClusterActiveMasterAddr"
 // key indicating the active master's startup time
 const keyClusterActiveMasterSince = "keyClusterActiveMasterSince"
-
+// key indicating the seed list for the cluster (not the complete list until sniffed)
 const keyClusterSeedList = "keyClusterSeedList"
 
 // key indicating the event / api call is related to cluster-forming activities
