@@ -73,7 +73,7 @@ const keyClusterSeedList = "keyClusterSeedList"
 // key indicating the event / api call is related to cluster-forming activities
 // value is either true or false.
 // PS. if the event / api is not related to this type... probably you don't need to include this information
-const keyClusterFormingEventType = "keyClusterFormingEventType"
+// const keyClusterFormingEventType = "keyClusterFormingEventType"
 
 
 

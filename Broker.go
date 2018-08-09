@@ -320,7 +320,16 @@ func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSe
         if err != nil {
             return err
         }
-fmt.Println (res)
+
+        // translate the return message
+        if res.StatusCode != 200 {
+            bArr, err := queutil.GetHttpResponseContent(res)
+            if err != nil {
+                return err
+            }
+            // b.logger.Info([]byte(fmt.Sprintf("[broker] response from cluster status sync => [%v]\n", string(bArr))))
+            return queutil.CreateErrorWithString(fmt.Sprintf("something is wrong when updating cluster-status; response => %v", string(bArr)))
+        }
         return nil
 
     } else {
