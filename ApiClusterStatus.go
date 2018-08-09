@@ -3,6 +3,8 @@ package main
 import (
     "github.com/emicklei/go-restful"
     "github.com/quoeamaster/queutil"
+    "github.com/buger/jsonparser"
+    "encoding/json"
     "fmt"
 )
 
@@ -37,8 +39,25 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
         panic(err)
     }
     // deserialize... (could not use the json.unmarshal() directly...)
-    fmt.Print(b, bArr)
+    seedList := make([]BrokerSeed, 0)
+    jsonparser.ArrayEach(bArr, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+        seed := new(BrokerSeed)
+        err = json.Unmarshal(value, seed)
+        if err != nil {
+            panic (err)
+        }
+        seedList = append(seedList, *seed)
+        // further extract value from the []byte
+        // fmt.Println(jsonparser.Get(value, "url"))
+    }, keyClusterStatusTypeMemory, keyClusterSeedList)
 
+    b.logger.Debug([]byte(fmt.Sprintf("[cluster_status] %v -> %v\n", len(seedList), seedList)))
+    // update cluster status
+    memMap := make(map[string]interface{})
+    memMap[keyClusterSeedList] = seedList
+    err = b.clusterStatusSrv.MergeClusterStatus(memMap, nil)
+    // TODO: testing ... REMOVE later
+    err = b.clusterStatusSrv.MergeClusterStatus(memMap, nil)
 
 }
 
@@ -49,6 +68,3 @@ func requestClusterStatusFromMaster (req *restful.Request, res *restful.Response
 
 }
 
-type ClusterSyncRequest struct {
-    Seeds []BrokerSeed
-}

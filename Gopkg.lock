@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/buger/jsonparser"
+  packages = ["."]
+  revision = "f4dd9f5a6b441265aefc1d44872a6f8c10f42b37"
+
+[[projects]]
   name = "github.com/emicklei/go-restful"
   packages = [
     ".",
@@ -60,7 +66,7 @@
   branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "e7a3fd2a1fc5cafc52ddd32428c1bc6aabf5ac60"
+  revision = "b23b9fcdcdb4d644c839aaec930407d0e3339162"
 
 [[projects]]
   name = "github.com/theckman/go-flock"
@@ -89,6 +95,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "04c7dc4f7fe9123b661146ac67744aa690a3f7d3660b9f43700411df374dc125"
+  inputs-digest = "c01b8491f03cdb03c8f46d3ecdc6dadb6e6c05ec3e15a6ae67cf57c51b3ce794"
   solver-name = "gps-cdcl"
   solver-version = 1

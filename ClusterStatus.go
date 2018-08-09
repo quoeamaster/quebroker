@@ -243,6 +243,53 @@ func (s *ClusterStatusService) initialClusterStatusWrite () error {
     return nil
 }
 
+func (s *ClusterStatusService) mergeValues (broker *Broker, existValue interface{}, targetValue interface{}) (finalValue interface{}) {
+    // assume only unique value would be maintained
+    if targetValue != nil && reflect.ValueOf(existValue) == reflect.ValueOf(targetValue) {
+        broker.logger.Info([]byte(fmt.Sprintf("[cluster_status] inside mergeValues => same type of existing and targetValue, type => [%v]\n", reflect.TypeOf(targetValue))))
+        // array or map?
+        existsType := reflect.TypeOf(existValue)
+        if existsType.Kind() == reflect.Slice {
+            broker.logger.Info([]byte ("[cluster_status] slice is found\n"))
+
+            // brittle way...
+            switch existValue.(type) {
+            case []BrokerSeed:
+                existSlice, _   := existValue.([]BrokerSeed)
+                targetSlice, _  := targetValue.([]BrokerSeed)
+                // TODO metric calculation.. to be removed
+                finalSlice := make([]BrokerSeed, 0)
+                iLoops := 0
+                iExpectedLoops := len(existSlice) + len(targetSlice)
+                // append only the missing ones
+                for _, tVal := range targetSlice {
+                    for _, eVal := range existSlice {
+                        iLoops+=1
+                        if strings.Compare(eVal.String(), tVal.String()) == 0 {
+                            break
+                        }
+                    }
+                    finalSlice = append(finalSlice, tVal)
+                }
+                broker.logger.Info([]byte (fmt.Sprintf("[cluster_status] merged => %v\n", finalSlice)))
+                broker.logger.Debug([]byte (fmt.Sprintf("[cluster_status] iLoop vs iExpectedLoops => %v vs %v\n", iLoops, iExpectedLoops)))
+
+                return finalSlice
+            // TODO: add other types handling here
+            default:
+                broker.logger.Warn([]byte(fmt.Sprintf("[cluster_status] unsupported type [%v]\n", existsType)))
+            }
+
+        } else if existsType.Kind() == reflect.Map {
+            broker.logger.Info([]byte ("[cluster_status] map is found\n"))
+// TODO: tbd on map operation(s)
+        } else {
+            broker.logger.Info([]byte (fmt.Sprintf("[cluster_status] %v is found\n", existsType.Kind())))
+        }
+    }
+    return existValue
+}
+
 // merge changes in the cluster status (both in-mem and persistable status)
 func (s *ClusterStatusService) MergeClusterStatus (
     memClusterStatusMap map[string]interface{},
@@ -250,16 +297,22 @@ func (s *ClusterStatusService) MergeClusterStatus (
 
     var buf bytes.Buffer
     numMerges := 0
+    b := GetBroker("")
 
-    buf.WriteString("[cluster_status] cluster status (in-memory) merged by the following keys: ")
+    buf.WriteString("[cluster_srv] cluster status (in-memory) merged by the following keys: ")
 
     if memClusterStatusMap != nil {
         for key, value := range memClusterStatusMap {
             if s.memLevelClusterStatusMap[key] != nil {
                 buf.WriteString(key)
                 numMerges += 1
+                // merge changes if necessary (e.g. if the original value is a Map or Array)
+                finalValue := s.mergeValues(b, s.memLevelClusterStatusMap[key], value)
+                s.memLevelClusterStatusMap[key] = finalValue
+
+            } else {
+                s.memLevelClusterStatusMap[key] = value
             }
-            s.memLevelClusterStatusMap[key] = value
         }
     }
     if numMerges == 0 {
@@ -273,8 +326,13 @@ func (s *ClusterStatusService) MergeClusterStatus (
             if s.persistableClusterStatusMap[key] != nil {
                 buf.WriteString(key)
                 numMerges += 1
+                // merge changes if necessary (e.g. if the original value is a Map or Array)
+                finalValue := s.mergeValues(b, s.persistableClusterStatusMap[key], value)
+                s.persistableClusterStatusMap[key] = finalValue
+
+            } else {
+                s.persistableClusterStatusMap[key] = value
             }
-            s.persistableClusterStatusMap[key] = value
         }
     }
     if numMerges == 0 {
@@ -283,11 +341,11 @@ func (s *ClusterStatusService) MergeClusterStatus (
     buf.WriteString(".\n")
     // log [info]
 // TODO: to debug later on
-    GetBroker("").logger.Info(buf.Bytes())
+    b.logger.Info(buf.Bytes())
 
     // debug
-    GetBroker("").logger.Debug([]byte(fmt.Sprintf("[cluster_status] %v\n", s.memLevelClusterStatusMap)))
-    GetBroker("").logger.Debug([]byte(fmt.Sprintf("[cluster_status] %v\n", s.persistableClusterStatusMap)))
+    b.logger.Debug([]byte(fmt.Sprintf("[cluster_srv] %v\n", s.memLevelClusterStatusMap)))
+    b.logger.Debug([]byte(fmt.Sprintf("[cluster_srv] %v\n", s.persistableClusterStatusMap)))
 
     return nil
 }
@@ -325,11 +383,11 @@ func (s *ClusterStatusService) Release(optionalParam map[string]interface{}) err
 
 // struct for cluster mem level reference
 type BrokerSeed struct {
-    UUID string
-    Name string
-    Addr string
-    RoleMaster bool
-    RoleData bool
+    UUID string         `json:"BrokerId"`
+    Name string         `json:"BrokerName"`
+    Addr string         `json:"BrokerCommunicationAddr"`
+    RoleMaster bool     `json:"RoleMaster"`
+    RoleData bool       `json:"RoleData"`
 }
 func (b *BrokerSeed) String () string {
     var buf bytes.Buffer

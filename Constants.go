@@ -54,6 +54,11 @@ const httpContentTypeJson = "application/json"
 // **   cluster status related  **
 // *******************************
 
+// key indicating a mem only cluster status
+const keyClusterStatusTypeMemory        = "keyClusterStatusTypeMemory"
+// key indicating a persist-able cluster status
+const keyClusterStatusTypePersistant    = "keyClusterStatusTypePersistant"
+
 // key indicating the active master's name
 const keyClusterActiveMasterName = "keyClusterActiveMasterName"
 // key indicating the active master's id (broker id)

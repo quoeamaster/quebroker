@@ -302,9 +302,17 @@ func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSe
             finalSeedList = append(finalSeedList, &seed)
         }
         var buf bytes.Buffer
-
+        /*
+         *  sample json to be created =>
+         * {"keyClusterStatusTypeMemory": {"keyClusterSeedList": [
+         *  {"BrokerId": "-LJNyr2mOuIDOiEUStzp","BrokerName": "broker_002","BrokerCommunicationAddr": "localhost:10031","RoleMaster": true,"RoleData": false},
+         *  {"BrokerId": "-LJNz7_bBnf8fcBlawCV","BrokerName": "broker_001","BrokerCommunicationAddr": "localhost:10030","RoleMaster": true,"RoleData": true}
+         * ]}}
+         */
         buf = queutil.BeginJsonStructure(buf)
+        buf = queutil.BeginObjectJsonStructure(buf, keyClusterStatusTypeMemory)
         buf = queutil.AddArrayToJsonStructure(buf, "keyClusterSeedList", finalSeedList)
+        buf = queutil.EndObjectJsonStructure(buf)
         buf = queutil.EndJsonStructure(buf)
         b.logger.Info([]byte(fmt.Sprintf("[broker] serialized broker seeds => %v\n", buf.String())))
 
