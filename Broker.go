@@ -249,9 +249,6 @@ func (b *Broker) createOrJoinCluster () {
                         networkHandshakeResponse.IsMasterReady,
                         networkHandshakeResponse.IsDataReady))
                 }
-//fmt.Println("a (local) =>", b.UUID)
-//fmt.Println("a (seed) =>", networkHandshakeResponse.BrokerId)
-
                 memMap := make(map[string]interface{})
                 memMap[keyClusterSeedList] = brokersList
 
@@ -267,7 +264,11 @@ func (b *Broker) createOrJoinCluster () {
                     b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update cluster_status for *SEEDS*, reason: %v\n", err)))
                 }
 
-                // TODO NEXT... election
+                // NEXT... election
+                optionMap = make(map[string]interface{})
+                optionMap[keyClusterSeedList] = b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)
+                b.logger.DebugString(fmt.Sprintf("[broker] %v\n", b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)))
+                b.discoveryPlugin.ElectMaster(optionMap)
             }
 
         } else {
@@ -275,21 +276,13 @@ func (b *Broker) createOrJoinCluster () {
             // TODO: startup on its own
         }
 
-/*
-                if networkHandshakeResponse.CanJoin {
-                    canBreakRetry = true
-
-// broadcast => pending_master_election : true ; member list (itself plus the active responding broker)
-// return value => success or not (sync status) plus the pending_master_election_timestamp (start of election request)
-//  the smaller request time wins and determines which side should run the election
-                }
- */
     default:
         // TODO: should it panic???
         b.logger.Warn([]byte(fmt.Sprintf("unknown signal received on the 'clusterJoinChannel' => %v\n", iSignal)))
     }
 }
 
+// update the seed list with the target broker member
 func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSeed, protocol string) error {
     if brokerSeeds != nil && len(brokerSeeds) > 0 {
         // last seed member is the target
@@ -314,7 +307,7 @@ func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSe
         buf = queutil.AddArrayToJsonStructure(buf, "keyClusterSeedList", finalSeedList)
         buf = queutil.EndObjectJsonStructure(buf)
         buf = queutil.EndJsonStructure(buf)
-        b.logger.Info([]byte(fmt.Sprintf("[broker] serialized broker seeds => %v\n", buf.String())))
+        b.logger.Debug([]byte(fmt.Sprintf("[broker] serialized broker seeds => %v\n", buf.String())))
 
         res, err := b.restClient.Post(syncClusterStatusUrl, httpContentTypeJson, &buf)
         if err != nil {

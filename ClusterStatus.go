@@ -380,6 +380,48 @@ func (s *ClusterStatusService) Release(optionalParam map[string]interface{}) err
     return nil
 }
 
+// return the value under the given key (to the caller, it doesn't matter
+// whether the cluster status is MEMory or PERsistent level
+func (s *ClusterStatusService) GetClusterStatusByKey (key string) interface{} {
+    broker := GetBroker("")
+
+    // mem level
+    // PS. for mem level .. they could be normal golang objects;
+    // whilst for persistent level, they might be json formatted...
+    // (conversion back to golang object might be required)
+    val := s.memLevelClusterStatusMap[key]
+    if val == nil {
+        // try persistent level
+        val = s.persistableClusterStatusMap[key]
+    }
+
+    switch val.(type) {
+    case string:
+        // do nothing...
+        broker.logger.Info([]byte(fmt.Sprintf("[cluster_srv] cluster status under key [%v] is string [%v]\n", key, val.(string))))
+
+    case []BrokerSeed:
+        // convert anything else back to string (json)
+        seedList := val.([]BrokerSeed)
+        finalSeedList := make([]interface{}, 0)
+        for i := range seedList {
+            seed := seedList[i]
+            finalSeedList = append(finalSeedList, &seed)
+        }
+        // json-fy
+        var b bytes.Buffer
+        b = queutil.BeginJsonStructure(b)
+        b = queutil.AddArrayToJsonStructure(b, keyClusterSeedList, finalSeedList)
+        b = queutil.EndJsonStructure(b)
+        val = b.String()
+
+    default:
+        broker.logger.InfoString(fmt.Sprintf("==> no idea, type is %v\n", reflect.TypeOf(val)))
+    }
+
+    return val
+}
+
 
 // struct for cluster mem level reference
 type BrokerSeed struct {

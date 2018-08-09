@@ -148,6 +148,8 @@ func (s *SimpleDiscoveryPlugin) buildHandShakeJsonBody (clusterName, seed string
 
 
 func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (brokerId string, err error) {
+    fmt.Println("**** inside electMaster (simpleDiscoveryPlugin)")
+
 
     return "", nil
 }
