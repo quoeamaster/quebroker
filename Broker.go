@@ -77,6 +77,8 @@ type Broker struct {
     // channel for clusterJoin related activities (int is used to save network overhead)
     clusterJoinChannel chan int
 
+    asyncApiChannel chan string
+
     // the http.client for this broker instance (re-use)
     restClient *http.Client
 }
@@ -129,6 +131,7 @@ func newBroker(configPath string) (*Broker, error) {
 
     // init the channel ready for cluster join / create activities
     m.clusterJoinChannel = make(chan int, 1)
+    m.asyncApiChannel = make(chan string, 1)
 
     timeout, err := time.ParseDuration("30s")
     if err != nil {
@@ -180,6 +183,8 @@ func (b *Broker) StartBroker() error {
     b.discoveryPlugin = b.createDiscoveryModuleByModuleName(b.config.DiscoveryModuleName)
     go b.createOrJoinCluster()
     b.clusterJoinChannel <- ChanSignalCreateOrJoinCluster
+
+    go b.listenToAsyncApiReturn()
 
     // sniff for valid seed list members, then trigger Master election
 
@@ -254,21 +259,36 @@ func (b *Broker) createOrJoinCluster () {
 
                 err := b.clusterStatusSrv.MergeClusterStatus(memMap, nil)
                 if err != nil {
-                    // TODO: panic or just log?
                     b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update *LOCAL* cluster_status, reason: %v\n", err)))
                 }
                 // send update to the target seed as well
                 err = b.updateClusterSeedListToMemClusterStatus(brokersList, optionMap[KeyDiscoverySecurityScheme].(string))
                 if err != nil {
-                    // TODO: panic or just log?
                     b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update cluster_status for *SEEDS*, reason: %v\n", err)))
                 }
 
-                // NEXT... election
+                // NEXT... election (TODO: add rules on quorum here???)
                 optionMap = make(map[string]interface{})
-                optionMap[keyClusterSeedList] = b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)
+                optionMap[KeyDiscoverySeedList] = b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)
+                optionMap[KeyDiscoveryLogger] = b.logger
                 b.logger.DebugString(fmt.Sprintf("[broker] %v\n", b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)))
-                b.discoveryPlugin.ElectMaster(optionMap)
+                // handle return values... broadcast the master info to all connected broker(s)
+                masterId, masterMap, err := b.discoveryPlugin.ElectMaster(optionMap)
+                if err != nil {
+                    // something wrong with master election consider it as hazardous
+                    panic (err)
+                }
+                if queutil.IsStringEmpty(masterId) {
+                   panic (queutil.CreateErrorWithString("could not elect a master! Due to some reasons, please check the configuration files if there were any master-ready brokers"))
+                }
+                b.logger.InfoString(fmt.Sprintf("*** %v %v\n", masterId, masterMap))
+                // async way to broadcast the active master's info to the cluster members
+                b.broadcastActiveMasterToSeeds(brokersList, masterMap)
+
+
+
+
+
             }
 
         } else {
@@ -279,6 +299,67 @@ func (b *Broker) createOrJoinCluster () {
     default:
         // TODO: should it panic???
         b.logger.Warn([]byte(fmt.Sprintf("unknown signal received on the 'clusterJoinChannel' => %v\n", iSignal)))
+    }
+    // close the createOrJoin channel (later on should use any routine or channel to re-elect new master after active master is down??)
+    close(b.clusterJoinChannel)
+}
+
+func (b *Broker) broadcastActiveMasterToSeeds (seeds []BrokerSeed, masterMap map[string]interface{}) {
+    if seeds != nil && len(seeds) > 0 {
+        // stringify the active master's data
+        var contentBody bytes.Buffer
+        masterBroker := *new(BrokerSeed)
+        masterBroker.UUID = masterMap["brokerId"].(string)
+        masterBroker.Name = masterMap["brokerName"].(string)
+        masterBroker.Addr = masterMap["brokerCommAddr"].(string)
+        masterBroker.Timestamp = (masterMap["brokerSince"].(time.Time)).Unix()
+        contentBody = queutil.ConvertInterfaceToJsonStructure(contentBody, masterBroker)
+        // TODO: wrap the above content under the structure of
+        /*{
+            "keyClusterStatusTypeMemory": {
+                "keyClusterSeedList": [
+                    {"BrokerId": "-LJNz7_bBnf8fcBlawCV","BrokerName": "broker_001","BrokerCommunicationAddr": "localhost:10030","RoleMaster": true,"RoleData": true,"Since": 0},
+                    {"BrokerId": "-LJXsdIbCqLcX9cfW1UI","BrokerName": "broker_002","BrokerCommunicationAddr": "localhost:10031","RoleMaster": true,"RoleData": false,"Since": 0}
+                ]
+            }
+        }*/
+
+        for _, seed := range seeds {
+            // create url
+            clusterStatusSyncUrl := queutil.BuildGenericApiUrl(seed.Addr, "", "_clusterstatus/sync")
+            go b.asyncApiCall(clusterStatusSyncUrl, contentBody, httpMethodPost)
+        }
+    }
+
+    // asyncApiChannel
+}
+
+func (b *Broker) listenToAsyncApiReturn() {
+    // should be non nil and json formatted
+    returnContent := <- b.asyncApiChannel
+
+    b.logger.InfoString(fmt.Sprintf("[broker] async api return => %v\n", returnContent))
+}
+
+func (b *Broker) asyncApiCall (apiUrl string, contentBody bytes.Buffer, httpMethod string) {
+    switch httpMethod {
+    case httpMethodGet:
+        b.logger.InfoString("*** not yet implemented ***")
+
+    case httpMethodPost:
+        res, err := b.restClient.Post(apiUrl, httpContentTypeJson, &contentBody)
+        if err != nil {
+            b.logger.WarnString(fmt.Sprintf("[broker] calling \"%v\" got error => %v\n", apiUrl, err))
+        } else {
+            bArr, err := queutil.GetHttpResponseContent(res)
+            if err != nil {
+                b.logger.WarnString(fmt.Sprintf("[broker] calling \"%v\" OK but reading the response content got error => %v\n", apiUrl, err))
+            } else {
+                b.asyncApiChannel <- string(bArr)
+            }
+        }
+    default:
+        b.logger.WarnString(fmt.Sprintf("[broker] non supported http method [%v]\n", httpMethod))
     }
 }
 

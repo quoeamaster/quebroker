@@ -7,6 +7,7 @@ import (
     "bytes"
     "strings"
     "time"
+    "github.com/buger/jsonparser"
 )
 
 type SimpleDiscoveryPlugin struct {
@@ -147,11 +148,73 @@ func (s *SimpleDiscoveryPlugin) buildHandShakeJsonBody (clusterName, seed string
 }
 
 
-func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (brokerId string, err error) {
-    fmt.Println("**** inside electMaster (simpleDiscoveryPlugin)")
+func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (brokerId string, returnValues map[string]interface{}, err error) {
+    var logger *queutil.FlexLogger
+    var seedListString string
+    seedListOfMap := make([]map[string]string, 0)
 
+    if val := params[KeyDiscoveryLogger]; val != nil {
+        logger = val.(*queutil.FlexLogger)
+    }
+    if val := params[KeyDiscoverySeedList]; val != nil {
+        seedListString = val.(string)
+        // TODO: get back the broker.id for master election
+        // TODO: (compare with Id is the smallest, that broker wins).
+        // TODO: tie-break by brokerName comparison as well; if not... random pick one
+        jsonparser.ArrayEach([]byte(seedListString), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+            m := make(map[string]string)
 
-    return "", nil
+            // only master-ready broker(s) should compete for election
+            isMasterReady, err := jsonparser.GetBoolean(value, "RoleMaster")
+            if isMasterReady {
+                bArr, _, _, err := jsonparser.Get(value, "BrokerId")
+                if err == nil {
+                    m["id"] = string(bArr)
+                }
+                bArr, _, _, err = jsonparser.Get(value, "BrokerName")
+                if err == nil {
+                    m["name"] = string(bArr)
+                }
+                bArr, _, _, err = jsonparser.Get(value, "BrokerCommunicationAddr")
+                if err == nil {
+                    m["addr"] = string(bArr)
+                }
+                seedListOfMap = append(seedListOfMap, m)
+            }
+        }, keyClusterSeedList)
+    }
+
+    var master map[string]string
+    masterId := ""
+    for _, seedMap := range seedListOfMap {
+        if queutil.IsStringEmpty(masterId) {
+            // the 1st possible master
+            master = seedMap
+            masterId = master["id"]
+
+        } else {
+            if strings.Compare(master["id"], seedMap["id"]) > 0 {
+                master = seedMap
+                masterId = master["id"]
+            }
+        }
+    }
+    if logger != nil {
+        // make it debug (as there might be debates later on);
+        // instead a final INFO level information would be listed out eventually
+        logger.InfoString(fmt.Sprintf("[simple disovery] elected Master => %v\n", master))
+    }
+
+    // final return parameters
+    brokerId = master["id"]
+    err = nil
+    returnValues = make(map[string]interface{})
+    returnValues["brokerId"] = masterId
+    returnValues["brokerName"] = master["name"]
+    returnValues["brokerCommAddr"] = master["addr"]
+    returnValues["brokerSince"] = time.Now().UTC()
+
+    return brokerId, returnValues, err
 }
 
 

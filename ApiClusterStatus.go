@@ -40,6 +40,7 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
     if err != nil {
         panic(err)
     }
+    b.logger.InfoString(string(bArr))
     // deserialize... and prepare the Map(s) for cluster status update
     syncClusterStatusOnBrokerSeeds(&memMap, &bArr)
 

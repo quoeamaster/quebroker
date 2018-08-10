@@ -49,6 +49,8 @@ const ChanSignalCreateOrJoinCluster = 1
 // http content type => json
 const httpContentTypeJson = "application/json"
 
+const httpMethodGet = "GET"
+const httpMethodPost = "POST"
 
 // *******************************
 // **   cluster status related  **

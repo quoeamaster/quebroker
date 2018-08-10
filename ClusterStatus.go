@@ -430,6 +430,7 @@ type BrokerSeed struct {
     Addr string         `json:"BrokerCommunicationAddr"`
     RoleMaster bool     `json:"RoleMaster"`
     RoleData bool       `json:"RoleData"`
+    Timestamp int64     `json:"Since"`
 }
 func (b *BrokerSeed) String () string {
     var buf bytes.Buffer
@@ -440,6 +441,8 @@ func (b *BrokerSeed) String () string {
     buf = queutil.AddStringToJsonStructure(buf, "BrokerCommunicationAddr", b.Addr)
     buf = queutil.AddBoolToJsonStructure(buf, "RoleMaster", b.RoleMaster)
     buf = queutil.AddBoolToJsonStructure(buf, "RoleData", b.RoleData)
+    buf = queutil.AddInt64ToJsonStructure(buf, "Since", b.Timestamp)
+
     buf = queutil.EndJsonStructure(buf)
 
     return buf.String()
