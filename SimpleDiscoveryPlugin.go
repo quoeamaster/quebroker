@@ -92,14 +92,14 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
         }
 
         for _, seed := range seedList {
-
             // avoid pinging itself... itself MUST always be join-able (common sense)
             if strings.Compare(url, seed) == 0 {
                 continue
             }
             handshakeUrl := queutil.BuildGenericApiUrl(seed, securityScheme, "_network/_handshake")
             bJsonBody := s.buildHandShakeJsonBody(clusterName, seed)
-            // do handshake (call the corresponding broker's _network/_handshake endpoint
+
+            // do handshake (call the corresponding broker's _network/_handshake endpoint)
             res, err := restClient.Post(handshakeUrl, httpContentTypeJson, &bJsonBody)
             if err != nil {
                 // retry on the next round (give the target broker a chance)
@@ -107,13 +107,11 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
                     logger.Info([]byte(fmt.Sprintf("[discovery] failed to connect [%v], retry again...\n", seed)))
                 }
             } else {
-
                 bArr, err := queutil.GetHttpResponseContent(res)
                 if err != nil {
                     logger.Warn([]byte(fmt.Sprintf("[discovery] failed to read the response from [%v], error => [%v]\n", seed, err.Error())))
                     continue
                 }
-
                 // update the return values to include the []byte of the response from network/_handshake api
                 returnValues[KeyDiscoveryHandshakeResponseByteArray]  = bArr
 

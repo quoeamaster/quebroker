@@ -54,8 +54,6 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
     }, keyClusterStatusTypeMemory, "nonexists")
 
     // update cluster status
-    // TODO: testing ... REMOVE later
-    // err = b.clusterStatusSrv.MergeClusterStatus(memMap, perMap)
     err = b.clusterStatusSrv.MergeClusterStatus(memMap, perMap)
     if err != nil {
         b.logger.Err([]byte(fmt.Sprintf("[cluster_status] could not update cluster status; error => %v\n", err)))
@@ -82,6 +80,8 @@ func syncClusterStatus (req *restful.Request, res *restful.Response) {
                 response.PersistentClusterStatusUpdateKeys = append(response.PersistentClusterStatusUpdateKeys, key)
             }
         }
+        // the values itself is not json... but when return back to the caller
+        // the results are transformed back to json (is it necessary?)
         res.WriteHeaderAndJson(200, *response, httpContentTypeJson)
     }
 }
