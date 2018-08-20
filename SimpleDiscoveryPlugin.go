@@ -77,7 +77,7 @@ func (s *SimpleDiscoveryPlugin) Ping (payload string,
     }
 
     brokerSeedVOPtr := new(queutil.BrokerSeedVO)
-    err = json.Unmarshal([]byte(payload), *brokerSeedVOPtr)
+    err = json.Unmarshal([]byte(payload), brokerSeedVOPtr)
     if err != nil {
         if logger != nil {
             logger.ErrString(fmt.Sprintf("[discovery - Ping] failed to unmarshal the json payload => %v\n", err))

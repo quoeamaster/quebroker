@@ -402,9 +402,9 @@ func (s *ClusterStatusService) GetClusterStatusByKey (key string) interface{} {
         // do nothing...
         broker.logger.Info([]byte(fmt.Sprintf("[cluster_srv] cluster status under key [%v] is string [%v]\n", key, val.(string))))
 
-    case []BrokerSeed:
+    case []queutil.BrokerSeedVO:
         // convert anything else back to string (json)
-        seedList := val.([]BrokerSeed)
+        seedList := val.([]queutil.BrokerSeedVO)
         finalSeedList := make([]interface{}, 0)
         for i := range seedList {
             seed := seedList[i]

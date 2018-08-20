@@ -2,10 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7b9ce9e0-3b70-4e7e-a710-2a9c3ee5b2cc" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ApiClusterStatus.go" beforeDir="false" afterPath="$PROJECT_DIR$/ApiClusterStatus.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ApiNetwork.go" beforeDir="false" afterPath="$PROJECT_DIR$/ApiNetwork.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Broker.go" beforeDir="false" afterPath="$PROJECT_DIR$/Broker.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ClusterStatus.go" beforeDir="false" afterPath="$PROJECT_DIR$/ClusterStatus.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Gopkg.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Gopkg.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" beforeDir="false" afterPath="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" afterDir="false" />
@@ -44,20 +40,20 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="SimpleDiscoveryPlugin.go" pinned="false" current-in-tab="true">
+      <file leaf-file-name="SimpleDiscoveryPlugin.go" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/SimpleDiscoveryPlugin.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="389">
-              <caret line="233" column="24" selection-start-line="233" selection-start-column="24" selection-end-line="233" selection-end-column="24" />
+            <state relative-caret-position="180">
+              <caret line="21" column="104" selection-start-line="21" selection-start-column="104" selection-end-line="21" selection-end-column="104" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="false">
+      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="702">
-              <caret line="288" column="102" lean-forward="true" selection-start-line="288" selection-start-column="102" selection-end-line="288" selection-end-column="102" />
+            <state relative-caret-position="483">
+              <caret line="417" column="24" selection-start-line="417" selection-start-column="24" selection-end-line="417" selection-end-column="24" />
               <folding>
                 <element signature="n#!!block;n#NewClusterStatusService#0" />
               </folding>
@@ -78,7 +74,7 @@
         <entry file="file://$PROJECT_DIR$/ApiClusterStatus.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="58">
-              <caret line="58" column="36" lean-forward="true" selection-start-line="58" selection-start-column="36" selection-end-line="58" selection-end-column="36" />
+              <caret line="58" column="36" selection-start-line="58" selection-start-column="36" selection-end-line="58" selection-end-column="36" />
             </state>
           </provider>
         </entry>
@@ -140,6 +136,10 @@
       <find>brokerSeed</find>
       <find>syncTargetBrokerClusterStatus</find>
       <find>updateClusterSeeds</find>
+      <find>failed to unmarshal the json pay</find>
+      <find>no diea</find>
+      <find>no idea</find>
+      <find>no ide</find>
     </findStrings>
   </component>
   <component name="GOROOT" path="/usr/local/Cellar/go/1.10.2/libexec" />
@@ -162,9 +162,9 @@
         <option value="$PROJECT_DIR$/Constants.go" />
         <option value="$PROJECT_DIR$/ApiNetwork.go" />
         <option value="$PROJECT_DIR$/ApiClusterStatus.go" />
-        <option value="$PROJECT_DIR$/ClusterStatus.go" />
         <option value="$PROJECT_DIR$/Broker.go" />
         <option value="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" />
+        <option value="$PROJECT_DIR$/ClusterStatus.go" />
       </list>
     </option>
   </component>
@@ -333,13 +333,6 @@
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/Constants.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="975">
-          <caret line="65" column="24" selection-start-line="65" selection-start-column="6" selection-end-line="65" selection-end-column="24" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ApiClusterStatus.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="525">
@@ -627,13 +620,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ApiStats.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="315">
-          <caret line="21" selection-start-line="21" selection-end-line="21" selection-end-column="74" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Gopkg.lock">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-3">
@@ -684,20 +670,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="702">
-          <caret line="288" column="102" lean-forward="true" selection-start-line="288" selection-start-column="102" selection-end-line="288" selection-end-column="102" />
-          <folding>
-            <element signature="n#!!block;n#NewClusterStatusService#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ApiClusterStatus.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="58">
-          <caret line="58" column="36" lean-forward="true" selection-start-line="58" selection-start-column="36" selection-end-line="58" selection-end-column="36" />
+          <caret line="58" column="36" selection-start-line="58" selection-start-column="36" selection-end-line="58" selection-end-column="36" />
         </state>
       </provider>
     </entry>
@@ -713,8 +689,32 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/SimpleDiscoveryPlugin.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="389">
-          <caret line="233" column="24" selection-start-line="233" selection-start-column="24" selection-end-line="233" selection-end-column="24" />
+        <state relative-caret-position="180">
+          <caret line="21" column="104" selection-start-line="21" selection-start-column="104" selection-end-line="21" selection-end-column="104" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vendor/github.com/quoeamaster/queutil/JsonUtil.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="210">
+          <caret line="107" column="5" selection-start-line="107" selection-start-column="5" selection-end-line="107" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ApiStats.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="270">
+          <caret line="21" selection-start-line="21" selection-end-line="21" selection-end-column="74" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="483">
+          <caret line="417" column="24" selection-start-line="417" selection-start-column="24" selection-end-line="417" selection-end-column="24" />
+          <folding>
+            <element signature="n#!!block;n#NewClusterStatusService#0" />
+          </folding>
         </state>
       </provider>
     </entry>
