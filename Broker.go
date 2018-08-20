@@ -205,6 +205,8 @@ func (b *Broker) createDiscoveryModuleByModuleName (moduleName string) queplugin
     }
 }
 
+// ------------------------------------------------------------------------------------------------------------
+
 func (b *Broker) createOrJoinCluster () {
     b.logger.Debug([]byte("** inside createOrJoinCluster routine"))
 
@@ -212,13 +214,28 @@ func (b *Broker) createOrJoinCluster () {
     switch iSignal {
     case ChanSignalCreateOrJoinCluster:
         // force to sleep for 1000 ms
-        // (sort of throttle to keep the broker less busy during startup)
+        // (sort of throttle to keep the broker less busy during startup) // todo: could be a RANDOM interval instead
         time.Sleep(time.Millisecond * 1000)
 
+        brokerSeedVOPtr := new(queutil.BrokerSeedVO)
+        brokerSeedVOPtr.ClusterName = b.config.ClusterName
+        brokerSeedVOPtr.DiscoveryBrokerSeeds = b.config.ClusterDiscoverySimpleSeeds
+        brokerSeedVOPtr.BrokerCommunicationAddr = b.config.BrokerCommunicationAddress
+
+        if queutil.IsStringEmpty(b.config.SecurityScheme) {
+            brokerSeedVOPtr.SecurityScheme = ""
+        } else {
+            brokerSeedVOPtr.SecurityScheme = b.config.SecurityScheme
+        }
         optionMap := make(map[string]interface{})
+        optionMap[KeyDiscoveryLogger] = b.logger
+
+        valid, jsonResponse, _, err := b.discoveryPlugin.Ping(brokerSeedVOPtr.JsonString(), optionMap)
+
+        /*
         optionMap[KeyDiscoveryClusterName]  = b.config.ClusterName
         optionMap[KeyDiscoverySeedList]     = b.config.ClusterDiscoverySimpleSeeds
-        optionMap[KeyDiscoveryLogger]       = b.logger
+
         if !queutil.IsStringEmpty(b.config.SecurityScheme) {
             optionMap[KeyDiscoverySecurityScheme] = b.config.SecurityScheme
         } else {
@@ -226,9 +243,12 @@ func (b *Broker) createOrJoinCluster () {
         }
 
         valid, returnMap, err := b.discoveryPlugin.Ping(b.config.BrokerCommunicationAddress, optionMap)
+        */
+
+
         // valid to join cluster with the target seedList (1 of them)
         if valid {
-            bArr := returnMap[KeyDiscoveryHandshakeResponseByteArray].([]byte)
+            // bArr := returnMap[KeyDiscoveryHandshakeResponseByteArray].([]byte)
             /*  message format in json should be the following
                 {
                  "CanJoin": true,
@@ -240,25 +260,30 @@ func (b *Broker) createOrJoinCluster () {
                  "BrokerId": "-LJNz7_bBnf8fcBlawCV"
                 }
              */
-            networkHandshakeResponse := new(NetworkHandshakeResponse)
-            err = json.Unmarshal(bArr, networkHandshakeResponse)
+            brokerSeedVOResponsePtr := new(queutil.BrokerSeedVO)
+            //err = json.Unmarshal(bArr, brokerSeedVOResponsePtr)
+            err = json.Unmarshal([]byte(jsonResponse), brokerSeedVOResponsePtr)
             if err != nil {
-                b.logger.WarnString(fmt.Sprintf("[broker] failed to unmarshal data from the response of [%v], error => [%v]\n", networkHandshakeResponse.BrokerCommunicationAddr, err.Error()))
+                b.logger.WarnString(fmt.Sprintf("[broker] failed to unmarshal data from the response of [%v], error => [%v]\n", brokerSeedVOResponsePtr.BrokerCommunicationAddr, err.Error()))
             }
             // can join.. hooray -> broadcast to the members (actively known online)
             // for cluster_status update (broker list)
             // sniffing is done after master election (not that important in general)
-            if networkHandshakeResponse.CanJoin {
+            if brokerSeedVOResponsePtr.CanJoin {
                 // update itself and target seed's "cluster seed list"
-                brokersList, err := b.updateClusterSeeds (*networkHandshakeResponse)
+                brokerSeedVOList, bufPtr, err := b.updateClusterSeeds (brokerSeedVOResponsePtr)
+b.logger.InfoString(fmt.Sprintf("%v\n", brokerSeedVOList))
+b.logger.InfoString(fmt.Sprintf("%v\n", (*bufPtr).String()))
+b.logger.InfoString(fmt.Sprintf("%v\n", err))
 
                 // NEXT... election (TODO: add rules on quorum here???)
                 optionMap = make(map[string]interface{})
                 // json-fy version of the cluster seeds
-                optionMap[KeyDiscoverySeedList] = b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)
+                // ** optionMap[KeyDiscoverySeedList] = b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)
                 optionMap[KeyDiscoveryLogger] = b.logger
-                b.logger.DebugString(fmt.Sprintf("[broker] %v\n", b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)))
+                b.logger.InfoString(fmt.Sprintf("[broker] %v\n", b.clusterStatusSrv.GetClusterStatusByKey(keyClusterSeedList)))
 
+                /*
                 masterId, masterMap, err := b.discoveryPlugin.ElectMaster(optionMap)
                 // something wrong with master election consider it as hazardous
                 if err != nil || queutil.IsStringEmpty(masterId) {
@@ -266,8 +291,8 @@ func (b *Broker) createOrJoinCluster () {
                 }
                 b.logger.InfoString(fmt.Sprintf("*** %v %v\n", masterId, masterMap))
                 // async way to broadcast the active master's info to the cluster members
-                b.broadcastActiveMasterToSeeds(brokersList, masterMap)
-
+                b.broadcastActiveMasterToSeeds(brokerSeedVOList, masterMap)
+*/
 
 
 
@@ -289,41 +314,42 @@ func (b *Broker) createOrJoinCluster () {
 
 // update itself's cluster status, also the target seed's cluster status
 // on the "cluster seed list" (ping-able seed list)
-func (b *Broker) updateClusterSeeds (handshakeResponse NetworkHandshakeResponse) ([]BrokerSeed, error) {
-    brokersList := make([]BrokerSeed, 0)
+func (b *Broker) updateClusterSeeds (brokerSeedVOResponsePtr *queutil.BrokerSeedVO) ([]queutil.BrokerSeedVO, *bytes.Buffer, error) {
+    brokersList := make([]queutil.BrokerSeedVO, 0)
     // itself
-    brokersList = append(brokersList, NewBrokerSeed(
-        b.UUID, b.config.BrokerName,
-        b.config.BrokerCommunicationAddress,
-        b.config.RoleMasterReady, b.config.RoleDataReady))
+    brokerSeedVOPtr := new(queutil.BrokerSeedVO)
+    brokerSeedVOPtr.BrokerId = b.UUID
+    brokerSeedVOPtr.BrokerName = b.config.BrokerName
+    brokerSeedVOPtr.BrokerCommunicationAddr = b.config.BrokerCommunicationAddress
+    brokerSeedVOPtr.IsMasterReady = b.config.RoleMasterReady
+    brokerSeedVOPtr.IsDataReady = b.config.RoleDataReady
+
+    brokersList = append(brokersList, *brokerSeedVOPtr)
     // seed
-    if strings.Compare(b.UUID, handshakeResponse.BrokerId) != 0 {
-        brokersList = append(brokersList, NewBrokerSeed(
-            handshakeResponse.BrokerId,
-            handshakeResponse.BrokerName,
-            handshakeResponse.BrokerCommunicationAddr,
-            handshakeResponse.IsMasterReady,
-            handshakeResponse.IsDataReady))
+    if strings.Compare(b.UUID, brokerSeedVOResponsePtr.BrokerId) != 0 {
+        brokersList = append(brokersList, *brokerSeedVOResponsePtr)
     }
+
+    // update the cluster_status of itself first
     memMap := make(map[string]interface{})
     memMap[keyClusterSeedList] = brokersList
-
     err := b.clusterStatusSrv.MergeClusterStatus(memMap, nil)
     if err != nil {
-        b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update *LOCAL* cluster_status, reason: %v\n", err)))
+        b.logger.ErrString(fmt.Sprintf("[broker] failed to update *LOCAL* cluster_status, reason: %v\n", err))
     }
-    // send update to the target seed as well
+
+    // update the cluster status of the target seed as well
     protocol := b.config.SecurityScheme
     if len(strings.TrimSpace(protocol)) == 0 {
         protocol = ""
     }
-    err = b.updateClusterSeedListToMemClusterStatus(brokersList, protocol)
+    bufPtr, err := b.syncTargetBrokerClusterStatus(brokersList, protocol)
     if err != nil {
         b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update cluster_status for *SEEDS*, reason: %v\n", err)))
     }
     b.logger.InfoString(fmt.Sprintf("[broker] cluster [%v] formed\n", b.config.ClusterName))
 
-    return brokersList, nil
+    return brokersList, bufPtr, nil
 }
 
 func (b *Broker) broadcastActiveMasterToSeeds (seeds []BrokerSeed, masterMap map[string]interface{}) {
@@ -387,18 +413,19 @@ func (b *Broker) asyncApiCall (apiUrl string, contentBody bytes.Buffer, httpMeth
 }
 
 // update the seed list with the target broker member
-func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSeed, protocol string) error {
+func (b *Broker) syncTargetBrokerClusterStatus(brokerSeeds []queutil.BrokerSeedVO, protocol string) (*bytes.Buffer, error) {
+
     if brokerSeeds != nil && len(brokerSeeds) > 0 {
         // last seed member is the target
         seed := brokerSeeds[len(brokerSeeds)-1]
-        syncClusterStatusUrl := queutil.BuildGenericApiUrl(seed.Addr, protocol, "_clusterstatus/sync")
+        syncClusterStatusUrl := queutil.BuildGenericApiUrl(
+            seed.BrokerCommunicationAddr, protocol, "_clusterstatus/sync")
 
         finalSeedList := make([]interface{}, 0)
         for idx := range brokerSeeds {
             seed := brokerSeeds[idx]
             finalSeedList = append(finalSeedList, &seed)
         }
-        var buf bytes.Buffer
         /*
          *  sample json to be created =>
          * {"keyClusterStatusTypeMemory": {"keyClusterSeedList": [
@@ -406,6 +433,8 @@ func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSe
          *  {"BrokerId": "-LJNz7_bBnf8fcBlawCV","BrokerName": "broker_001","BrokerCommunicationAddr": "localhost:10030","RoleMaster": true,"RoleData": true}
          * ]}}
          */
+        var buf bytes.Buffer
+
         buf = queutil.BeginJsonStructure(buf)
         buf = queutil.BeginObjectJsonStructure(buf, keyClusterStatusTypeMemory)
         buf = queutil.AddArrayToJsonStructure(buf, "keyClusterSeedList", finalSeedList)
@@ -415,23 +444,23 @@ func (b *Broker) updateClusterSeedListToMemClusterStatus (brokerSeeds []BrokerSe
 
         res, err := b.restClient.Post(syncClusterStatusUrl, httpContentTypeJson, &buf)
         if err != nil {
-            return err
+            return nil, err
         }
 
         // translate the return message
         if res.StatusCode != 200 {
             bArr, err := queutil.GetHttpResponseContent(res)
             if err != nil {
-                return err
+                return nil, err
             }
             // b.logger.Info([]byte(fmt.Sprintf("[broker] response from cluster status sync => [%v]\n", string(bArr))))
-            return queutil.CreateErrorWithString(fmt.Sprintf("something is wrong when updating cluster-status; response => %v", string(bArr)))
+            return nil, queutil.CreateErrorWithString(fmt.Sprintf("something is wrong when updating cluster-status; response => %v", string(bArr)))
         }
-        return nil
+        return &buf, nil
 
     } else {
         b.logger.Warn([]byte("[broker] no broker seed list provided HENCE no cluster operation done"))
-        return nil
+        return nil, nil
     }
 }
 

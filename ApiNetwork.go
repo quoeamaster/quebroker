@@ -4,9 +4,9 @@ import (
     "github.com/emicklei/go-restful"
     "fmt"
     "github.com/quoeamaster/queutil"
-    "encoding/json"
     "strings"
     "bytes"
+    "github.com/buger/jsonparser"
 )
 
 func NewNetworkApiModule () *restful.WebService {
@@ -31,44 +31,50 @@ func handshake (req *restful.Request, res *restful.Response) {
     if err != nil {
         panic(err)
     }
-    request := new(NetworkHandshakeRequest)
-    err = json.Unmarshal(bArr, request)
+    requestClusterName, err := jsonparser.GetString(bArr, "clusterName")
     if err != nil {
         panic(err)
     }
+    /*request := new(NetworkHandshakeRequest)
+    err = json.Unmarshal(bArr, request)
+    if err != nil {
+        panic(err)
+    }*/
+
     // get back the Broker instance
     b := GetBroker("")
     if b.logger != nil {
-        b.logger.Debug([]byte(fmt.Sprintf ("[network] inside handshake api => %v, %v\n", request.ClusterName, request.SeedIP)))
+        b.logger.Debug([]byte(fmt.Sprintf ("[network] inside handshake api => expecting cluster to be: %v\n", requestClusterName)))
     }
 
-    response := new(NetworkHandshakeResponse)
-    if strings.Compare(b.config.ClusterName, request.ClusterName) == 0 {
-        response.CanJoin = true
+    //brokerSeedVOPtr := new(NetworkHandshakeResponse)
+    brokerSeedVOPtr := new(queutil.BrokerSeedVO)
+    if strings.Compare(b.config.ClusterName, requestClusterName) == 0 {
+        brokerSeedVOPtr.CanJoin = true
     } else {
-        response.CanJoin = false
+        brokerSeedVOPtr.CanJoin = false
     }
 // TODO: update the role(s) when necessary in the future (for now only Master.Ready and Data.Ready role)
-    response.IsMasterReady = b.config.RoleMasterReady
-    response.IsDataReady = b.config.RoleDataReady
+    brokerSeedVOPtr.IsMasterReady = b.config.RoleMasterReady
+    brokerSeedVOPtr.IsDataReady = b.config.RoleDataReady
 
-    response.IsActiveMaster = b.isMaster
+    brokerSeedVOPtr.IsActiveMaster = b.isMaster
 
-    response.BrokerName = b.config.BrokerName
-    response.BrokerCommunicationAddr = b.config.BrokerCommunicationAddress
-    response.BrokerId = b.UUID
+    brokerSeedVOPtr.BrokerName = b.config.BrokerName
+    brokerSeedVOPtr.BrokerCommunicationAddr = b.config.BrokerCommunicationAddress
+    brokerSeedVOPtr.BrokerId = b.UUID
 
     // close request body as already read all parameters
     req.Request.Body.Close()
 
-    // write out to the response
-    // bArr, err = json.Marshal(response)
-    if response.CanJoin {
-        err = res.WriteHeaderAndJson(200, response, restful.MIME_JSON)
+    // write out to the brokerSeedVOPtr
+    // bArr, err = json.Marshal(brokerSeedVOPtr)
+    if brokerSeedVOPtr.CanJoin {
+        err = res.WriteHeaderAndJson(200, *brokerSeedVOPtr, restful.MIME_JSON)
     } else {
         // accepted (sort of ok but not the perfect situation;
         // in this case everything fine except can't join the cluster)
-        err = res.WriteHeaderAndJson(202, response, restful.MIME_JSON)
+        err = res.WriteHeaderAndJson(202, *brokerSeedVOPtr, restful.MIME_JSON)
     }
     if err != nil {
         panic(err)

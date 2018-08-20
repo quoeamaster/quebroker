@@ -60,19 +60,19 @@
   branch = "master"
   name = "github.com/quoeamaster/queplugin"
   packages = ["."]
-  revision = "527d1b448c77dc2b97191103a9f02702208e3e89"
+  revision = "3a1e497f7f7cbb68ac62bf9cb211936c5a123ad6"
 
 [[projects]]
   branch = "master"
   name = "github.com/quoeamaster/queutil"
   packages = ["."]
-  revision = "00fb34143d145249ed4a5af5f62753c4b3ec7723"
+  revision = "3e8c969c76525b7dec9879824ea15125643533ab"
 
 [[projects]]
   name = "github.com/theckman/go-flock"
   packages = ["."]
-  revision = "b139a2487364247d91814e4a7c7b8fdc69e342b2"
-  version = "v0.4.0"
+  revision = "dd99ba217509348e899885ee977b6e2acb18179c"
+  version = "v0.5.0"
 
 [[projects]]
   name = "gopkg.in/linkedin/goavro.v2"

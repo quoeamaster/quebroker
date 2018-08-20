@@ -243,10 +243,12 @@ func (s *ClusterStatusService) initialClusterStatusWrite () error {
     return nil
 }
 
-func (s *ClusterStatusService) mergeValues (broker *Broker, existValue interface{}, targetValue interface{}) (finalValue interface{}) {
+func (s *ClusterStatusService) mergeValues (
+    broker *Broker, existValue interface{}, targetValue interface{}) (finalValue interface{}) {
+
     // assume only unique value would be maintained
     if targetValue != nil && reflect.ValueOf(existValue) == reflect.ValueOf(targetValue) {
-        broker.logger.Info([]byte(fmt.Sprintf("[cluster_status] inside mergeValues => same type of existing and targetValue, type => [%v]\n", reflect.TypeOf(targetValue))))
+        broker.logger.InfoString(fmt.Sprintf("[cluster_status] inside mergeValues => same type of existing and targetValue, type => [%v]\n", reflect.TypeOf(targetValue)))
         // array or map?
         existsType := reflect.TypeOf(existValue)
         if existsType.Kind() == reflect.Slice {
@@ -254,37 +256,37 @@ func (s *ClusterStatusService) mergeValues (broker *Broker, existValue interface
 
             // brittle way...
             switch existValue.(type) {
-            case []BrokerSeed:
-                existSlice, _   := existValue.([]BrokerSeed)
-                targetSlice, _  := targetValue.([]BrokerSeed)
-                // TODO metric calculation.. to be removed
-                finalSlice := make([]BrokerSeed, 0)
-                iLoops := 0
-                iExpectedLoops := len(existSlice) + len(targetSlice)
+            case []queutil.BrokerSeedVO:
+                existSlice, _   :=  existValue.([]queutil.BrokerSeedVO)
+                targetSlice, _  := targetValue.([]queutil.BrokerSeedVO)
+                finalSlice := make([]queutil.BrokerSeedVO, 0)
+
+                // ** iLoops := 0
+                // ** iExpectedLoops := len(existSlice) + len(targetSlice)
                 // append only the missing ones
                 for _, tVal := range targetSlice {
                     for _, eVal := range existSlice {
-                        iLoops+=1
-                        if strings.Compare(eVal.String(), tVal.String()) == 0 {
+                        // ** iLoops+=1
+                        if strings.Compare(eVal.JsonString(), tVal.JsonString()) == 0 {
                             break
                         }
                     }
                     finalSlice = append(finalSlice, tVal)
                 }
-                broker.logger.Info([]byte (fmt.Sprintf("[cluster_status] merged => %v\n", finalSlice)))
-                broker.logger.Debug([]byte (fmt.Sprintf("[cluster_status] iLoop vs iExpectedLoops => %v vs %v\n", iLoops, iExpectedLoops)))
+                broker.logger.InfoString(fmt.Sprintf("[cluster_status] merged => %v\n", finalSlice))
+                // ** broker.logger.Debug([]byte (fmt.Sprintf("[cluster_status] iLoop vs iExpectedLoops => %v vs %v\n", iLoops, iExpectedLoops)))
 
                 return finalSlice
             // TODO: add other types handling here
             default:
-                broker.logger.Warn([]byte(fmt.Sprintf("[cluster_status] unsupported type [%v]\n", existsType)))
+                broker.logger.WarnString(fmt.Sprintf("[cluster_status] unsupported type [%v]\n", existsType))
             }
 
         } else if existsType.Kind() == reflect.Map {
             broker.logger.Info([]byte ("[cluster_status] map is found\n"))
 // TODO: tbd on map operation(s)
         } else {
-            broker.logger.Info([]byte (fmt.Sprintf("[cluster_status] %v is found\n", existsType.Kind())))
+            broker.logger.InfoString(fmt.Sprintf("[cluster_status] %v is found\n", existsType.Kind()))
         }
     }
     return existValue

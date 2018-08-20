@@ -8,11 +8,10 @@ import (
     "strings"
     "time"
     "github.com/buger/jsonparser"
+    "encoding/json"
 )
 
-type SimpleDiscoveryPlugin struct {
-
-}
+type SimpleDiscoveryPlugin struct {}
 
 // implementation on the join cluster operation:
 // 1. get back the simple discovery seed list
@@ -24,12 +23,17 @@ type SimpleDiscoveryPlugin struct {
 //
 // for this implementation; the seed list member(s) are visited 1 by 1; and would join the cluster once a member is handshake-d.
 // sniffing (finding all members in the cluster) and handshake are basically 2 types of operations
-func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}) (valid bool, returnValues map[string]interface{}, err error) {
-    var seedList []string
-    var clusterName string
+func (s *SimpleDiscoveryPlugin) Ping (payload string,
+    options map[string]interface{}) (valid bool, jsonResponse string,
+        returnValues map[string]interface{}, err error) {
+
     var logger *queutil.FlexLogger
     var restClient *http.Client
+    /*
+    var seedList []string
+    var clusterName string
     var securityScheme string
+    */
 
     defer func() {
         if r := recover(); r != nil {
@@ -49,7 +53,7 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
 
     valid = false
     err = nil
-    returnValues = make(map[string]interface{})
+    // returnValues = make(map[string]interface{})
 
     // get back the parameter(s) for the ping
     if options != nil {
@@ -58,6 +62,7 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
             logger = val.(*queutil.FlexLogger)
         }
         // get seedList []string
+        /*
         if val := options[KeyDiscoverySeedList]; val != nil {
             seedList = val.([]string)
         }
@@ -68,14 +73,23 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
         // security scheme
         if val := options[KeyDiscoverySecurityScheme]; val != nil {
             securityScheme = val.(string)
+        }*/
+    }
+
+    brokerSeedVOPtr := new(queutil.BrokerSeedVO)
+    err = json.Unmarshal([]byte(payload), *brokerSeedVOPtr)
+    if err != nil {
+        if logger != nil {
+            logger.ErrString(fmt.Sprintf("[discovery - Ping] failed to unmarshal the json payload => %v\n", err))
         }
+        return valid, "", nil, err
     }
 
     // for SimpleDiscovery; just call the corresponding REST api would do
     // (other discovery modules might have their own way to ping cluster members)
     pingTimeout, err := queutil.CreateTimeoutByString("5s")
     if err != nil {
-        return valid, returnValues, err
+        return valid,"", nil, err
     }
     restClient = queutil.GenerateHttpClient(pingTimeout, nil, nil, nil)
 
@@ -91,29 +105,30 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
             time.Sleep(time.Millisecond * 2000)
         }
 
-        for _, seed := range seedList {
+        for _, seed := range brokerSeedVOPtr.DiscoveryBrokerSeeds {
             // avoid pinging itself... itself MUST always be join-able (common sense)
-            if strings.Compare(url, seed) == 0 {
+            if strings.Compare(payload, seed) == 0 {
                 continue
             }
-            handshakeUrl := queutil.BuildGenericApiUrl(seed, securityScheme, "_network/_handshake")
-            bJsonBody := s.buildHandShakeJsonBody(clusterName, seed)
+            handshakeUrl := queutil.BuildGenericApiUrl(seed, brokerSeedVOPtr.SecurityScheme, "_network/_handshake")
+            bJsonBody := s.buildHandShakeJsonBody(brokerSeedVOPtr.ClusterName, seed)
 
             // do handshake (call the corresponding broker's _network/_handshake endpoint)
             res, err := restClient.Post(handshakeUrl, httpContentTypeJson, &bJsonBody)
             if err != nil {
                 // retry on the next round (give the target broker a chance)
                 if logger != nil {
-                    logger.Info([]byte(fmt.Sprintf("[discovery] failed to connect [%v], retry again...\n", seed)))
+                    logger.InfoString(fmt.Sprintf("[discovery - ping] failed to connect [%v], retry again...\n", seed))
                 }
             } else {
                 bArr, err := queutil.GetHttpResponseContent(res)
                 if err != nil {
-                    logger.Warn([]byte(fmt.Sprintf("[discovery] failed to read the response from [%v], error => [%v]\n", seed, err.Error())))
+                    logger.WarnString(fmt.Sprintf("[discovery - ping] failed to read the response from [%v], error => [%v]\n", seed, err.Error()))
                     continue
                 }
                 // update the return values to include the []byte of the response from network/_handshake api
-                returnValues[KeyDiscoveryHandshakeResponseByteArray]  = bArr
+                jsonResponse = string(bArr)
+                // returnValues[KeyDiscoveryHandshakeResponseByteArray]  = bArr
 
                 // only 200 status is ok to join; 202 is everything is fine except can't join the cluster together
                 if res.StatusCode == 200 {
@@ -131,7 +146,7 @@ func (s *SimpleDiscoveryPlugin) Ping (url string, options map[string]interface{}
             }   // end -- if err (valid)
         }
     }
-    return valid, returnValues, err
+    return valid, jsonResponse, nil, err
 }
 
 func (s *SimpleDiscoveryPlugin) buildHandShakeJsonBody (clusterName, seed string) bytes.Buffer {
@@ -139,14 +154,18 @@ func (s *SimpleDiscoveryPlugin) buildHandShakeJsonBody (clusterName, seed string
 
     b = queutil.BeginJsonStructure(b)
     b = queutil.AddStringToJsonStructure(b, "clusterName", clusterName)
-    b = queutil.AddStringToJsonStructure(b, "seedIP", seed)
+    // b = queutil.AddStringToJsonStructure(b, "seedIP", seed)
     b = queutil.EndJsonStructure(b)
 
     return b
 }
 
+// ---------------------------------------------------------------------------
 
-func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (brokerId string, returnValues map[string]interface{}, err error) {
+
+func (s *SimpleDiscoveryPlugin) ElectMaster (payload string,
+    params map[string]interface{}) (brokerId string, jsonResponse string, returnValues map[string]interface{}, err error) {
+
     var logger *queutil.FlexLogger
     var seedListString string
     seedListOfMap := make([]map[string]string, 0)
@@ -212,7 +231,7 @@ func (s *SimpleDiscoveryPlugin) ElectMaster (params map[string]interface{}) (bro
     returnValues["brokerCommAddr"] = master["addr"]
     returnValues["brokerSince"] = time.Now().UTC()
 
-    return brokerId, returnValues, err
+    return brokerId, "", returnValues, err
 }
 
 
