@@ -271,9 +271,10 @@ func (b *Broker) createOrJoinCluster () {
             // sniffing is done after master election (not that important in general)
             if brokerSeedVOResponsePtr.CanJoin {
                 // update itself and target seed's "cluster seed list"
-                brokerSeedVOList, bufPtr, err := b.updateClusterSeeds (brokerSeedVOResponsePtr)
+                brokerSeedVOList, seedListString, err := b.updateClusterSeeds (brokerSeedVOResponsePtr)
+b.logger.InfoString("@@@ well... tbd\n\n")
 b.logger.InfoString(fmt.Sprintf("%v\n", brokerSeedVOList))
-b.logger.InfoString(fmt.Sprintf("%v\n", (*bufPtr).String()))
+b.logger.InfoString(fmt.Sprintf("%v\n", seedListString))
 b.logger.InfoString(fmt.Sprintf("%v\n", err))
 
                 // NEXT... election (TODO: add rules on quorum here???)
@@ -314,7 +315,7 @@ b.logger.InfoString(fmt.Sprintf("%v\n", err))
 
 // update itself's cluster status, also the target seed's cluster status
 // on the "cluster seed list" (ping-able seed list)
-func (b *Broker) updateClusterSeeds (brokerSeedVOResponsePtr *queutil.BrokerSeedVO) ([]queutil.BrokerSeedVO, *bytes.Buffer, error) {
+func (b *Broker) updateClusterSeeds (brokerSeedVOResponsePtr *queutil.BrokerSeedVO) ([]queutil.BrokerSeedVO, string, error) {
     brokersList := make([]queutil.BrokerSeedVO, 0)
     // itself
     brokerSeedVOPtr := new(queutil.BrokerSeedVO)
@@ -343,13 +344,13 @@ func (b *Broker) updateClusterSeeds (brokerSeedVOResponsePtr *queutil.BrokerSeed
     if len(strings.TrimSpace(protocol)) == 0 {
         protocol = ""
     }
-    bufPtr, err := b.syncTargetBrokerClusterStatus(brokersList, protocol)
+    seedListString, err := b.syncTargetBrokerClusterStatus(brokersList, protocol)
     if err != nil {
         b.logger.Err([]byte(fmt.Sprintf("[broker] failed to update cluster_status for *SEEDS*, reason: %v\n", err)))
     }
     b.logger.InfoString(fmt.Sprintf("[broker] cluster [%v] formed\n", b.config.ClusterName))
 
-    return brokersList, bufPtr, nil
+    return brokersList, seedListString, nil
 }
 
 func (b *Broker) broadcastActiveMasterToSeeds (seeds []BrokerSeed, masterMap map[string]interface{}) {
@@ -413,7 +414,7 @@ func (b *Broker) asyncApiCall (apiUrl string, contentBody bytes.Buffer, httpMeth
 }
 
 // update the seed list with the target broker member
-func (b *Broker) syncTargetBrokerClusterStatus(brokerSeeds []queutil.BrokerSeedVO, protocol string) (*bytes.Buffer, error) {
+func (b *Broker) syncTargetBrokerClusterStatus(brokerSeeds []queutil.BrokerSeedVO, protocol string) (string, error) {
 
     if brokerSeeds != nil && len(brokerSeeds) > 0 {
         // last seed member is the target
@@ -440,27 +441,28 @@ func (b *Broker) syncTargetBrokerClusterStatus(brokerSeeds []queutil.BrokerSeedV
         buf = queutil.AddArrayToJsonStructure(buf, "keyClusterSeedList", finalSeedList)
         buf = queutil.EndObjectJsonStructure(buf)
         buf = queutil.EndJsonStructure(buf)
+        seedListJson := buf.String()
         b.logger.Debug([]byte(fmt.Sprintf("[broker] serialized broker seeds => %v\n", buf.String())))
 
         res, err := b.restClient.Post(syncClusterStatusUrl, httpContentTypeJson, &buf)
         if err != nil {
-            return nil, err
+            return "", err
         }
 
         // translate the return message
         if res.StatusCode != 200 {
             bArr, err := queutil.GetHttpResponseContent(res)
             if err != nil {
-                return nil, err
+                return "", err
             }
             // b.logger.Info([]byte(fmt.Sprintf("[broker] response from cluster status sync => [%v]\n", string(bArr))))
-            return nil, queutil.CreateErrorWithString(fmt.Sprintf("something is wrong when updating cluster-status; response => %v", string(bArr)))
+            return "", queutil.CreateErrorWithString(fmt.Sprintf("something is wrong when updating cluster-status; response => %v", string(bArr)))
         }
-        return &buf, nil
+        return seedListJson, nil
 
     } else {
         b.logger.Warn([]byte("[broker] no broker seed list provided HENCE no cluster operation done"))
-        return nil, nil
+        return "", nil
     }
 }
 

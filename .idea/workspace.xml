@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7b9ce9e0-3b70-4e7e-a710-2a9c3ee5b2cc" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/ClusterStatus.go" beforeDir="false" afterPath="$PROJECT_DIR$/ClusterStatus.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Gopkg.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Gopkg.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" beforeDir="false" afterPath="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Broker.go" beforeDir="false" afterPath="$PROJECT_DIR$/Broker.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -28,11 +26,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Broker.go" pinned="false" current-in-tab="false">
+      <file leaf-file-name="Broker.go" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/Broker.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="370">
-              <caret line="283" column="29" selection-start-line="283" selection-start-column="29" selection-end-line="283" selection-end-column="29" />
+            <state relative-caret-position="110">
+              <caret line="274" column="40" selection-start-line="274" selection-start-column="40" selection-end-line="274" selection-end-column="40" />
               <folding>
                 <element signature="e#12049#13498#0" />
               </folding>
@@ -49,7 +47,7 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="true">
+      <file leaf-file-name="ClusterStatus.go" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ClusterStatus.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="483">
@@ -162,9 +160,9 @@
         <option value="$PROJECT_DIR$/Constants.go" />
         <option value="$PROJECT_DIR$/ApiNetwork.go" />
         <option value="$PROJECT_DIR$/ApiClusterStatus.go" />
-        <option value="$PROJECT_DIR$/Broker.go" />
         <option value="$PROJECT_DIR$/SimpleDiscoveryPlugin.go" />
         <option value="$PROJECT_DIR$/ClusterStatus.go" />
+        <option value="$PROJECT_DIR$/Broker.go" />
       </list>
     </option>
   </component>
@@ -270,7 +268,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/Broker.go</url>
-          <line>469</line>
+          <line>471</line>
           <option name="timeStamp" value="3" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
@@ -285,7 +283,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/Broker.go</url>
-          <line>442</line>
+          <line>444</line>
           <option name="timeStamp" value="9" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
@@ -295,7 +293,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/Broker.go</url>
-          <line>291</line>
+          <line>292</line>
           <option name="timeStamp" value="13" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
@@ -306,7 +304,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/Broker.go</url>
-          <line>335</line>
+          <line>336</line>
           <properties />
           <option name="timeStamp" value="16" />
         </line-breakpoint>
@@ -318,7 +316,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/Broker.go</url>
-          <line>345</line>
+          <line>346</line>
           <properties />
           <option name="timeStamp" value="19" />
         </line-breakpoint>
@@ -677,23 +675,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/Broker.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="370">
-          <caret line="283" column="29" selection-start-line="283" selection-start-column="29" selection-end-line="283" selection-end-column="29" />
-          <folding>
-            <element signature="e#12049#13498#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/SimpleDiscoveryPlugin.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="21" column="104" selection-start-line="21" selection-start-column="104" selection-end-line="21" selection-end-column="104" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/vendor/github.com/quoeamaster/queutil/JsonUtil.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="210">
@@ -714,6 +695,23 @@
           <caret line="417" column="24" selection-start-line="417" selection-start-column="24" selection-end-line="417" selection-end-column="24" />
           <folding>
             <element signature="n#!!block;n#NewClusterStatusService#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/SimpleDiscoveryPlugin.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="21" column="104" selection-start-line="21" selection-start-column="104" selection-end-line="21" selection-end-column="104" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Broker.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="110">
+          <caret line="274" column="40" selection-start-line="274" selection-start-column="40" selection-end-line="274" selection-end-column="40" />
+          <folding>
+            <element signature="e#12049#13498#0" />
           </folding>
         </state>
       </provider>
