@@ -22,4 +22,5 @@ broker.id
 
 # ignore script folder
 script/*
+scripts/*
 
