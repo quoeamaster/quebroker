@@ -14,5 +14,5 @@ port = 6801
 name = "devCluster"
 
 [path]
-data = "${QUE_PATH_DATA}"
-log = "${QUE_PATH_LOG}"
+data = "${HOME}/data"
+log = "${HOME}/log"
