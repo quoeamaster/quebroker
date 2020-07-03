@@ -1,17 +1,18 @@
+# name of the broker (human readability)
+name = "broker_server_1"
 
-name: broker_server_1
+bootstrapServers = [ 
+    "http://localhost:6801", 
+    "http://localhost:6802" 
+]
 
-network:
-    hostname: http://localhost
-    port: 6801
+[network]
+hostname = "http://localhost"
+port = 6801
 
-bootstrapServersByHostname:
-- http://localhost:6801
-_ http://localhost:6802
+[cluster]
+name = "devCluster"
 
-cluster:
-    name: devCluster
-
-path:
-    data: ${QUE_PATH_DATA}
-    log: ${QUE_PATH_LOG}
+[path]
+data = "${QUE_PATH_DATA}"
+log = "${QUE_PATH_LOG}"
