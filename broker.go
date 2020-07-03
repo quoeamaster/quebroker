@@ -66,5 +66,6 @@ func (b *Broker) String() string {
 	_b.WriteString(fmt.Sprintf("  network.hostname [%v], network.port [%v]\n", b.Network.HostName, b.Network.Port))
 	_b.WriteString(fmt.Sprintf("  path.data [%v], path.log [%v]", b.Path.Data, b.Path.Log))
 
+	_b.WriteString("\n")
 	return _b.String()
 }
