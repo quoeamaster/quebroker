@@ -95,7 +95,15 @@ func (b *Broker) PopulateBrokerIDs() (err error) {
 		// reset the umask
 		syscall.Umask(_umaskOld)
 	} else {
-		// TODO: load the .broker.id and .cluster.id file values back to the Broker instance
+		// load the .broker.id and .cluster.id file values back to the Broker instance
+		b.ID, err = b.readIDFromFile(_homePath, brokerIDFile)
+		if err != nil {
+			return
+		}
+		b.Cluster.ID, err = b.readIDFromFile(_homePath, brokerClusterIDFile)
+		if err != nil {
+			return
+		}
 	}
 	return
 }
@@ -140,6 +148,17 @@ func (b *Broker) createIDFile(home string, filepath string, id string) (err erro
 	_filepath := fmt.Sprintf("%v%v%v", home, string(os.PathSeparator), filepath)
 	err = ioutil.WriteFile(_filepath, []byte(id), 0644)
 
+	return
+}
+
+// readIDFromFile - read id from the given file path
+func (b *Broker) readIDFromFile(home, filepath string) (id string, err error) {
+	_filepath := fmt.Sprintf("%v%v%v", home, string(os.PathSeparator), filepath)
+	_bytes, err := ioutil.ReadFile(_filepath)
+	if err != nil {
+		return
+	}
+	id = string(_bytes)
 	return
 }
 
