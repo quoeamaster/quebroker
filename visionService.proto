@@ -1,0 +1,39 @@
+syntax = "proto3";
+// explicit set the full package path for the generated class -> option go_package = "github.com/quoeamaster/quebroker/vision";
+option go_package = ".;vision";
+package vision;
+
+// [DOC] generation of xxx.pb.go from xxx.proto -> run at project root; create "vision" folder first
+// - protoc --go_out=vision visionService.proto
+
+// Request - provides all information required to run a Vision Request
+//    such as the targeted api, designated format and should the data be
+//    in verbose detail
+message Request {
+   // e.g. nodes (getting stats for nodes), slices (getting partition stats)
+   string api = 1;
+
+   // e.g. json, report (formatted tabular plain text)
+   string format = 2;
+
+   // need verbose information?
+   bool verbose = 3;
+}
+
+// Response - the response after executing the Request
+message Response {
+   // response in string (doesn't matter which format requested, the response MUST be in string)
+   string payload = 1;
+
+   // status code of the execution (e.g. 200 is good, 500 is internal error)
+   int32 code = 2;
+}
+
+// ------------------------------ //
+// ---   service declaration  --- //
+// ------------------------------ //
+
+service VisionService {
+   // GetVision - get the vision on the targeted api / service
+   rpc GetVision (Request) returns (Response);
+}

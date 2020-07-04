@@ -19,14 +19,48 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net"
 
 	"github.com/quoeamaster/quebroker"
+	"google.golang.org/grpc"
 )
 
-func main() {
-	_instance := new(quebroker.Broker)
-	_instance.Name = "b_server_01"
+// NetTCP - network protocol TCP
+const NetTCP = "tcp"
 
-	fmt.Printf("to be implemented on running a broker instance [%v]\n", "fake-broker-id")
-	fmt.Printf("empty Broker instance [%v]\n", _instance)
+func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCServer *grpc.Server, err error) {
+	// a. load broker config
+	broker, err1 := quebroker.BrokerInstanceFromTomlConfig()
+	if err1 != nil {
+		err = fmt.Errorf("could not load the broker configuration, reason :%v", err1)
+	}
+
+	// b. open TCP socket connection
+	tcpListener, err1 = net.Listen(NetTCP, fmt.Sprintf("%v:%v", broker.Network.HostName, broker.Network.Port))
+	if err1 != nil {
+		err = fmt.Errorf("failed to start up server, reason %v", err1)
+	}
+
+	// c. create gRPC server (kind of service bus / hub)
+	gRPCServer = grpc.NewServer()
+
+	// d. add back bindings with services
+
+	return
+}
+
+func main() {
+	// start up server
+	_broker, _tcpListener, _gRPCServer, err := _startServer()
+	if err != nil {
+		log.Fatalf("failed to start up server, reason %v\n", err)
+	}
+	log.Printf("Broker instance configs: [%v]\n", _broker)
+	log.Printf("listener: %v\n", _tcpListener.Addr().String())
+	log.Printf("gRPC server: %v\n", _gRPCServer)
+
+	defer _tcpListener.Close()
+
+	// TODO: handle os signal term?
 }
