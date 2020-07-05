@@ -57,6 +57,10 @@ type Broker struct {
 		HostName string // actual hostname or IP for connection
 		Port     int    // port number for this host
 	}
+
+	// service(s)
+	vision *vision.Service // service for vision API
+	// TODO: update the service(s) available
 }
 
 // String - description of a Broker
@@ -77,24 +81,23 @@ func (b *Broker) String() string {
 
 // Stop - stop or exit the broker sequence
 func (b *Broker) Stop() {
-	// TBD
+	// TODO: TBD
 	log.Info("heya, inside broker.stop")
+}
+
+func (b *Broker) setupServices() {
+	// TODO: update service definitions here
+	b.vision = vision.New()
 }
 
 // ***	vision service		*** //
 
 // GetVision - implementation of the vision service api
-func (b *Broker) GetVision(ctx context.Context, in *vision.Request) (out *vision.Response, err error) {
+func (b *Broker) GetVision(ctx context.Context, in *vision.Request) (*vision.Response, error) {
+	// implementation are within the package specific service.go, this file acts as an interface connector ONLY
 
-	// [DOC] => implementation are within the package specific xxximpl.go, this file acts as an interface connector ONLY
-
-	// testing...
+	//log.SetLevel(logrus.DebugLevel)
 	log.Debugf("Request: api [%v], format [%v], verbose [%v]: desc {%v}\n", in.Api, in.Format, in.Verbose, in.String())
 
-	// creating a fake response
-	out = new(vision.Response)
-	out.Code = 200
-	out.Payload = "{ \"message\": \"testing completed~\" }"
-
-	return
+	return b.vision.GetVision(ctx, in)
 }
