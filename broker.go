@@ -19,7 +19,11 @@ package quebroker
 
 import (
 	"fmt"
+	"log"
 	"strings"
+
+	"github.com/quoeamaster/quebroker/vision"
+	"golang.org/x/net/context"
 )
 
 const paramEnvTomlConfigPath = "QUE_CONFIG_TOML"
@@ -54,7 +58,7 @@ type Broker struct {
 	}
 }
 
-/// String - description of a Broker
+// String - description of a Broker
 func (b *Broker) String() string {
 	// TODO: update String method when new members are added
 	var _b strings.Builder
@@ -68,4 +72,22 @@ func (b *Broker) String() string {
 
 	_b.WriteString("\n")
 	return _b.String()
+}
+
+// ***	vision service		*** //
+
+// GetVision - implementation of the vision service api
+func (b *Broker) GetVision(ctx context.Context, in *vision.Request) (out *vision.Response, err error) {
+
+	// [DOC] => implementation are within the package specific xxximpl.go, this file acts as an interface connector ONLY
+
+	// testing...
+	log.Printf("Request: api [%v], format [%v], verbose [%v]: desc {%v}\n", in.Api, in.Format, in.Verbose, in.String())
+
+	// creating a fake response
+	out = new(vision.Response)
+	out.Code = 200
+	out.Payload = "{ \"message\": \"testing completed~\" }"
+
+	return
 }

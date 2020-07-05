@@ -7,7 +7,11 @@
 package vision
 
 import (
+	context "context"
 	proto "github.com/golang/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -249,4 +253,86 @@ func file_visionService_proto_init() {
 	file_visionService_proto_rawDesc = nil
 	file_visionService_proto_goTypes = nil
 	file_visionService_proto_depIdxs = nil
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ context.Context
+var _ grpc.ClientConnInterface
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion6
+
+// VisionServiceClient is the client API for VisionService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type VisionServiceClient interface {
+	// GetVision - get the vision on the targeted api / service
+	GetVision(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+}
+
+type visionServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewVisionServiceClient(cc grpc.ClientConnInterface) VisionServiceClient {
+	return &visionServiceClient{cc}
+}
+
+func (c *visionServiceClient) GetVision(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/vision.VisionService/GetVision", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// VisionServiceServer is the server API for VisionService service.
+type VisionServiceServer interface {
+	// GetVision - get the vision on the targeted api / service
+	GetVision(context.Context, *Request) (*Response, error)
+}
+
+// UnimplementedVisionServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedVisionServiceServer struct {
+}
+
+func (*UnimplementedVisionServiceServer) GetVision(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVision not implemented")
+}
+
+func RegisterVisionServiceServer(s *grpc.Server, srv VisionServiceServer) {
+	s.RegisterService(&_VisionService_serviceDesc, srv)
+}
+
+func _VisionService_GetVision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VisionServiceServer).GetVision(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vision.VisionService/GetVision",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VisionServiceServer).GetVision(ctx, req.(*Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _VisionService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "vision.VisionService",
+	HandlerType: (*VisionServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetVision",
+			Handler:    _VisionService_GetVision_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "visionService.proto",
 }

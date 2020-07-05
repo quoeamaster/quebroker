@@ -3,8 +3,13 @@ syntax = "proto3";
 option go_package = ".;vision";
 package vision;
 
+// [DOC] *** by default "service" part is ignored, need to use the grpc plugin to generate the service + message parts all in 1
+// - protoc --go_out=plugins=grpc:vision visionService.proto
+// ref: https://github.com/grpc/grpc-go/tree/master/examples
+
 // [DOC] generation of xxx.pb.go from xxx.proto -> run at project root; create "vision" folder first
 // - protoc --go_out=vision visionService.proto
+// * the above only generates the message part (be careful...)
 
 // Request - provides all information required to run a Vision Request
 //    such as the targeted api, designated format and should the data be
