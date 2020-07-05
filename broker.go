@@ -19,7 +19,6 @@ package quebroker
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/quoeamaster/quebroker/vision"
@@ -32,6 +31,8 @@ const brokerConfigToml = "quebroker.toml"
 const brokerHomeDir = ".quebroker"
 const brokerIDFile = ".broker.id"
 const brokerClusterIDFile = ".cluster.id"
+
+var log = GetBasicTextLogger()
 
 // Broker - representing a broker instance
 type Broker struct {
@@ -77,7 +78,7 @@ func (b *Broker) String() string {
 // Stop - stop or exit the broker sequence
 func (b *Broker) Stop() {
 	// TBD
-	fmt.Println("heya, inside broker.stop")
+	log.Info("heya, inside broker.stop")
 }
 
 // ***	vision service		*** //
@@ -88,7 +89,7 @@ func (b *Broker) GetVision(ctx context.Context, in *vision.Request) (out *vision
 	// [DOC] => implementation are within the package specific xxximpl.go, this file acts as an interface connector ONLY
 
 	// testing...
-	log.Printf("Request: api [%v], format [%v], verbose [%v]: desc {%v}\n", in.Api, in.Format, in.Verbose, in.String())
+	log.Debugf("Request: api [%v], format [%v], verbose [%v]: desc {%v}\n", in.Api, in.Format, in.Verbose, in.String())
 
 	// creating a fake response
 	out = new(vision.Response)

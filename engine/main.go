@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/quoeamaster/quebroker"
 	"github.com/quoeamaster/quebroker/vision"
@@ -34,7 +33,7 @@ import (
 // NetTCP - network protocol TCP
 const NetTCP = "tcp"
 
-var log = logrus.New() // TODO: add a file logger too
+var log = quebroker.GetBasicTextLogger() // TODO: add a file logger too
 
 // _startServer - method to start the gRPC server and bind services to it
 func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCServer *grpc.Server, err error) {
@@ -95,11 +94,7 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 
 // setupLoggers - method to setup logger configs
 func setupLoggers() {
-	// default logger
-	log.Out = os.Stderr
-	// per logger can have a different textFormatter -> for time format.. check the below
-	// https://golang.org/pkg/time/
-	log.SetFormatter(&logrus.TextFormatter{TimestampFormat: time.RFC3339, FullTimestamp: true})
+	// default logger (additional settings if any)
 
 	// TODO: file-logger
 }
