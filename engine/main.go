@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/quoeamaster/quebroker"
@@ -33,10 +35,6 @@ import (
 const NetTCP = "tcp"
 
 var log = logrus.New() // TODO: add a file logger too
-
-func _setupSignals() {
-
-}
 
 // _startServer - method to start the gRPC server and bind services to it
 func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCServer *grpc.Server, err error) {
@@ -63,6 +61,27 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	vision.RegisterVisionServiceServer(gRPCServer, broker)
 	log.WithFields(logrus.Fields{"vision": "service to retrieve stats of the broker"}).Info("[service registered]")
 
+	// y. start signal monitoring on terminate or interrupt
+	_signals := make(chan os.Signal, 1)
+	signal.Notify(_signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	go func() {
+		_sig := <-_signals
+		log.Infof("[signal received] %v", _sig)
+		// received either INTERRUPT or TERMINATE signal; gracefully exit
+		defer broker.Stop()
+		// [DOC] closing gRPCServer = closing tcpListener as well
+		/*
+			defer func() {
+				err2 := tcpListener.Close()
+				if err2 != nil {
+					err = fmt.Errorf("could not close network connector [tcp], reason: %v", err2)
+					return
+				}
+			}()
+		*/
+		defer gRPCServer.GracefulStop()
+	}()
+
 	// z. start to serve (with all services registered)
 	log.Infof("[bootstrap broker] address: %v", tcpListener.Addr().String())
 	err1 = gRPCServer.Serve(tcpListener)
@@ -88,22 +107,11 @@ func setupLoggers() {
 func main() {
 	setupLoggers()
 
-	// setup signal hooks
-	_setupSignals()
-
 	// start up server
-	_broker, _tcpListener, _gRPCServer, err := _startServer()
+	// _broker, _tcpListener, _gRPCServer, err := _startServer()
+	_, _, _, err := _startServer()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Broker instance configs: [%v]\n", _broker)
-	//log.Printf("listener: %v\n", _tcpListener.Addr().String())
-	//log.Printf("gRPC server: %v\n", _gRPCServer)
-
-	defer _tcpListener.Close()
-	defer _gRPCServer.Stop()
-
-	defer log.Infof("[stopping broker] exit sequence initiated...")
-
-	// TODO: handle os signal term?
+	log.Info("[broker stopped]")
 }

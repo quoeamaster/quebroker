@@ -74,6 +74,12 @@ func (b *Broker) String() string {
 	return _b.String()
 }
 
+// Stop - stop or exit the broker sequence
+func (b *Broker) Stop() {
+	// TBD
+	fmt.Println("heya, inside broker.stop")
+}
+
 // ***	vision service		*** //
 
 // GetVision - implementation of the vision service api
