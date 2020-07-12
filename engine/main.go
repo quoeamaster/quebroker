@@ -57,6 +57,7 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	gRPCServer = grpc.NewServer()
 
 	// d. add back service bindings
+	// TODO: add back new service bindings
 	vision.RegisterVisionServiceServer(gRPCServer, broker)
 	log.WithFields(logrus.Fields{"vision": "service to retrieve stats of the broker"}).Info("[service registered]")
 
@@ -80,6 +81,22 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 		*/
 		defer gRPCServer.GracefulStop()
 	}()
+
+	// e. bootstrap services (related)
+	// - 1. update the current meta-state, at least
+	// TODO: should have the following logic
+	// 	1) is this broker PRIMARY (master); if so, it could update state-version and others etc
+	//		2) state-version should be related to timestamp and hence later versions of the state could be identified
+	//broker.MetaState.Upsert(metastate.KeyStateVersion, "temp-setup-value-100001")
+	_, err = broker.MetaState.UpsertInMem("testing-A", 1234567890)
+	_, _, err = broker.MetaState.UpsertStateVersionByPrimaryBroker()
+	log.Infof("[updated state version and ID] [%v] - num [%v]\n",
+		broker.MetaState.GetStateVersion(),
+		broker.MetaState.GetStateVersionID())
+	_, err = broker.MetaState.Upsert("testing-Z", "nice to have it persisted", true, false) // if last param is true... update state-version one more time
+	if err != nil {
+		return
+	}
 
 	// z. start to serve (with all services registered)
 	log.Infof("[bootstrap broker] address: %v", tcpListener.Addr().String())

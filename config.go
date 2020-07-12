@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/configor"
+	"github.com/quoeamaster/quebroker/util"
 )
 
 // CreateFolders - method to create folder(s) such as Path.Data, Path.Log
@@ -38,7 +39,7 @@ func (b *Broker) CreateFolders() (err error) {
 	_folderRight = 0755 // for writes... (so creation of file need 'X', hence owner should be RWX = 7, others... usually for R+X = 5)
 
 	// [Path] Data
-	_exists, _ := isFileExists(b.Path.Data)
+	_exists, _ := util.IsFileExists(b.Path.Data)
 	if !_exists {
 		err = os.MkdirAll(b.Path.Data, _folderRight)
 		if err != nil {
@@ -46,7 +47,7 @@ func (b *Broker) CreateFolders() (err error) {
 		}
 	}
 	// [Path] Log
-	_exists, _ = isFileExists(b.Path.Log)
+	_exists, _ = util.IsFileExists(b.Path.Log)
 	if !_exists {
 		err = os.MkdirAll(b.Path.Log, _folderRight)
 		if err != nil {
@@ -67,18 +68,36 @@ func (b *Broker) PopulateBrokerIDs() (err error) {
 	if err != nil {
 		return
 	}
-	// b. {home}/.quebroker exists?
-	_exists, _homePath := isFileExists(_home, brokerHomeDir)
+	// b. generate id
+	err = b.generateIDs()
+	if err != nil {
+		return
+	}
+	// replace ENV VARS from the config strings (needs to update manually....)
+	// DOC: study on using reflection ? (but performance penalty)
+	_re, err := regexp.Compile(`\$\{[a-z|A-Z|_|-]+\}`)
+	if err != nil {
+		return
+	}
+	b.Name = replaceEnvVarValuesToString(b.Name, _re, b.ID)
+	b.Cluster.Name = replaceEnvVarValuesToString(b.Cluster.Name, _re, b.ID)
+	b.Network.HostName = replaceEnvVarValuesToString(b.Network.HostName, _re, b.ID)
+	b.Network.Port, err = strconv.Atoi(replaceEnvVarValuesToString(strconv.Itoa(b.Network.Port), _re, b.ID))
+	if err != nil {
+		return
+	}
+	b.Path.Data = replaceEnvVarValuesToString(b.Path.Data, _re, b.ID)
+	b.Path.Log = replaceEnvVarValuesToString(b.Path.Log, _re, b.ID)
+
+	// TODO: update the setters when new config values are available
+
+	// c. {home}/.quebroker exists?
+	_exists, _homePath := util.IsFileExists(_home, brokerHomeDir, string(os.PathSeparator), b.ID)
 	if !_exists {
 		_umaskOld := syscall.Umask(0) // resetting the umask on creating file's permission
-		// c. create home folder .quebroker
-		_homePath = fmt.Sprintf("%v%v%v", _home, string(os.PathSeparator), brokerHomeDir)
+		// d. create home folder .quebroker
+		_homePath = fmt.Sprintf("%v%v%v%v%v", _home, string(os.PathSeparator), brokerHomeDir, string(os.PathSeparator), b.ID)
 		err = os.MkdirAll(_homePath, 0755) // 755 or 644 (RWX => 421)
-		if err != nil {
-			return
-		}
-		// d. generate id
-		err = b.generateIDs()
 		if err != nil {
 			return
 		}
@@ -110,10 +129,16 @@ func (b *Broker) PopulateBrokerIDs() (err error) {
 
 // generateIDs - method to generate broker.id and cluster.id (usually for the 1st time)
 func (b *Broker) generateIDs() (err error) {
-	// a. get hostname and concat with home.dir, then trim to first 16 characters
-	_hostName, err := os.Hostname()
-	if err != nil {
-		return
+	var _hostName string
+
+	// a. either use broker-name OR get hostname and concat with home.dir, then trim to first 16 characters
+	if b.Name != "" {
+		_hostName = b.Name
+	} else {
+		_hostName, err = os.Hostname()
+		if err != nil {
+			return
+		}
 	}
 	_homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -167,7 +192,7 @@ func BrokerInstanceFromTomlConfig() (instance *Broker, err error) {
 	// get the toml config file location
 	// a) Env var or // b) local path
 	_tomlPath := os.Getenv(paramEnvTomlConfigPath)
-	_exists, _tomlPath := isFileExists(_tomlPath, brokerConfigToml)
+	_exists, _tomlPath := util.IsFileExists(_tomlPath, brokerConfigToml)
 
 	if !_exists {
 		err = fmt.Errorf(`
@@ -176,9 +201,6 @@ func BrokerInstanceFromTomlConfig() (instance *Broker, err error) {
 		return
 	}
 	// load file contents and populate into the Broker struct
-	//fmt.Println("existing file path", _tomlPath)
-
-	// test the config2Broker
 	instance, err = decodeTomlConfig2BrokerStruct(_tomlPath)
 	if err != nil {
 		return
@@ -194,6 +216,9 @@ func BrokerInstanceFromTomlConfig() (instance *Broker, err error) {
 		return
 	}
 
+	// TODO: other steps
+	instance.setupServices()
+
 	return
 }
 
@@ -202,29 +227,12 @@ func decodeTomlConfig2BrokerStruct(filepath string) (instance *Broker, err error
 	instance = new(Broker)
 	//err = configor.New(&configor.Config{Debug: true}).Load(instance, filepath)
 	err = configor.Load(instance, filepath)
-	// replace ENV VARS from the config strings (needs to update manually....)
-	// DOC: study on using reflection ? (but performance penalty)
-	_re, err := regexp.Compile(`\$\{[a-z|A-Z|_|-]+\}`)
-	if err != nil {
-		return
-	}
-	instance.Name = replaceEnvVarValuesToString(instance.Name, _re)
-	instance.Cluster.Name = replaceEnvVarValuesToString(instance.Cluster.Name, _re)
-	instance.Network.HostName = replaceEnvVarValuesToString(instance.Network.HostName, _re)
-	instance.Network.Port, err = strconv.Atoi(replaceEnvVarValuesToString(strconv.Itoa(instance.Network.Port), _re))
-	if err != nil {
-		return
-	}
-	instance.Path.Data = replaceEnvVarValuesToString(instance.Path.Data, _re)
-	instance.Path.Log = replaceEnvVarValuesToString(instance.Path.Log, _re)
-
-	// TODO: update the setters when new config values are available
 
 	return
 }
 
 // replaceEnvVarValuesToString - substitute the env variable values to the given string
-func replaceEnvVarValuesToString(value string, re *regexp.Regexp) (finalValue string) {
+func replaceEnvVarValuesToString(value string, re *regexp.Regexp, brokerID string) (finalValue string) {
 	finalValue = value
 
 	_params := re.FindAllString(finalValue, -1)
@@ -239,7 +247,7 @@ func replaceEnvVarValuesToString(value string, re *regexp.Regexp) (finalValue st
 			if err != nil {
 				return
 			}
-			_replace = fmt.Sprintf("%v%v%v", _replace, string(os.PathSeparator), brokerHomeDir)
+			_replace = fmt.Sprintf("%v%v%v%v%v", _replace, string(os.PathSeparator), brokerHomeDir, string(os.PathSeparator), brokerID)
 			finalValue = strings.Replace(finalValue, _param, _replace, 1)
 
 		default:
@@ -247,27 +255,5 @@ func replaceEnvVarValuesToString(value string, re *regexp.Regexp) (finalValue st
 			finalValue = strings.Replace(finalValue, _param, _replace, 1)
 		}
 	}
-	return
-}
-
-// isFileExists - check whether the given path (and its optional paths) exists or not
-func isFileExists(path string, paths ...string) (exists bool, configPath string) {
-	_path := path
-	if paths != nil {
-		if strings.Compare(_path, "") > 0 {
-			_path = fmt.Sprintf("%v%v%v", _path, string(os.PathSeparator), strings.Join(paths, ""))
-		} else {
-			_path = strings.Join(paths, "")
-		}
-	}
-	//fmt.Println("toml config path", _path, "*")
-	_, err := os.Stat(_path)
-	if os.IsNotExist(err) {
-		exists = false
-		return
-	}
-	// all good
-	exists = true
-	configPath = _path
 	return
 }

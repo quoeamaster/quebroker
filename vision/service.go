@@ -53,6 +53,7 @@ func (s *Service) setupLogger() {
 func (s *Service) GetVision(ctx context.Context, in *Request) (out *Response, err error) {
 	out = new(Response)
 
+	// TODO: add back real implementation
 	switch in.Api {
 	case APIBrokersVision:
 		out.Code = 200

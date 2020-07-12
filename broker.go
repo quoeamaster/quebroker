@@ -21,16 +21,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/quoeamaster/quebroker/metastate"
 	"github.com/quoeamaster/quebroker/vision"
 	"golang.org/x/net/context"
 )
-
-const paramEnvTomlConfigPath = "QUE_CONFIG_TOML"
-const paramEnvHomeDir = "HOME"
-const brokerConfigToml = "quebroker.toml"
-const brokerHomeDir = ".quebroker"
-const brokerIDFile = ".broker.id"
-const brokerClusterIDFile = ".cluster.id"
 
 var log = GetBasicTextLogger()
 
@@ -59,7 +53,8 @@ type Broker struct {
 	}
 
 	// service(s)
-	vision *vision.Service // service for vision API
+	vision    *vision.Service    // service for vision API
+	MetaState *metastate.Service // service for metaState handling
 	// TODO: update the service(s) available
 }
 
@@ -87,7 +82,9 @@ func (b *Broker) Stop() {
 
 func (b *Broker) setupServices() {
 	// TODO: update service definitions here
+	log.Trace("setup on services")
 	b.vision = vision.New()
+	b.MetaState = metastate.New(brokerHomeDir, b.ID)
 }
 
 // ***	vision service		*** //
