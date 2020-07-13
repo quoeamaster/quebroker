@@ -23,7 +23,6 @@ import (
 
 	"github.com/quoeamaster/quebroker/metastate"
 	"github.com/quoeamaster/quebroker/vision"
-	"golang.org/x/net/context"
 )
 
 var log = GetBasicTextLogger()
@@ -53,7 +52,7 @@ type Broker struct {
 	}
 
 	// service(s)
-	vision    *vision.Service    // service for vision API
+	Vision    *vision.Service    // service for vision API
 	MetaState *metastate.Service // service for metaState handling
 	// TODO: update the service(s) available
 }
@@ -83,18 +82,6 @@ func (b *Broker) Stop() {
 func (b *Broker) setupServices() {
 	// TODO: update service definitions here
 	log.Trace("setup on services")
-	b.vision = vision.New()
+	b.Vision = vision.New()
 	b.MetaState = metastate.New(brokerHomeDir, b.ID)
-}
-
-// ***	vision service		*** //
-
-// GetVision - implementation of the vision service api
-func (b *Broker) GetVision(ctx context.Context, in *vision.Request) (*vision.Response, error) {
-	// implementation are within the package specific service.go, this file acts as an interface connector ONLY
-
-	//log.SetLevel(logrus.DebugLevel)
-	log.Debugf("Request: api [%v], format [%v], verbose [%v]: desc {%v}\n", in.Api, in.Format, in.Verbose, in.String())
-
-	return b.vision.GetVision(ctx, in)
 }

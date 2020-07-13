@@ -58,7 +58,7 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 
 	// d. add back service bindings
 	// TODO: add back new service bindings
-	vision.RegisterVisionServiceServer(gRPCServer, broker)
+	vision.RegisterVisionServiceServer(gRPCServer, broker.Vision)
 	log.WithFields(logrus.Fields{"vision": "service to retrieve stats of the broker"}).Info("[service registered]")
 
 	// y. start signal monitoring on terminate or interrupt
