@@ -224,7 +224,7 @@ func BrokerInstanceFromTomlConfig() (instance *Broker, err error) {
 
 // decodeTomlConfig2BrokerStruct - load the toml' content into a Broker instance
 func decodeTomlConfig2BrokerStruct(filepath string) (instance *Broker, err error) {
-	instance = new(Broker)
+	instance = NewBroker()
 	//err = configor.New(&configor.Config{Debug: true}).Load(instance, filepath)
 	err = configor.Load(instance, filepath)
 

@@ -34,8 +34,8 @@ func TestBrokerInstanceFromTomlConfig(t *testing.T) {
 	if strings.Compare(_instance.Name, "broker_server_1") != 0 {
 		t.Errorf("%v[broker.name] expected [%v] BUT got [%v]", _h1, "broker_server_1", _instance.Name)
 	}
-	if len(_instance.BootstrapServers) != 2 {
-		t.Errorf("%v[boostrapServer length] expected [%v] BUT got [%v]", _h1, 2, len(_instance.BootstrapServers))
+	if len(_instance.Bootstrap.InitialPrimaryBrokersList) != 2 {
+		t.Errorf("%v[boostrapServer length] expected [%v] BUT got [%v]", _h1, 2, len(_instance.Bootstrap.InitialPrimaryBrokersList))
 	}
 	if strings.Compare(_instance.Cluster.Name, "devCluster") != 0 {
 		t.Errorf("%v[cluster.name] expected [%v] BUT got [%v]", _h1, "devCluster", _instance.Cluster.Name)
@@ -43,6 +43,18 @@ func TestBrokerInstanceFromTomlConfig(t *testing.T) {
 	if _instance.Network.Port != 6801 {
 		t.Errorf("%v[network.port] expected [%v] BUT got [%v]", _h1, 6801, _instance.Network.Port)
 	}
+
+	// test the isPrimary (without changing the bootstrap server list)
+	if !_instance.GetIsPrimaryCandidate() {
+		t.Errorf("%v[isPrimaryCandidate] expected [true] BUT got [%v]", _h1, _instance.GetIsPrimaryCandidate())
+	}
+	// altering the list of bootstrap servers (should not match anymore)
+	_instance.isPrimaryCandidate = -1
+	_instance.Bootstrap.InitialPrimaryBrokersList = []string{"server-1:9802", "localhost:10015"}
+	if _instance.GetIsPrimaryCandidate() {
+		t.Errorf("%v[isPrimaryCandidate] expected [false] BUT got [%v]", _h1, _instance.GetIsPrimaryCandidate())
+	}
+
 }
 
 func TestBrokerGenerateIDs(t *testing.T) {
@@ -50,7 +62,8 @@ func TestBrokerGenerateIDs(t *testing.T) {
 	_targetBrokerID := "6a61736f-6e73-2d4d-4250-5f5f55736572"
 	_targetClusterID := "20202020-2020-2064-6576-536572766572"
 
-	_instance := new(Broker)
+	//_instance := new(Broker)
+	_instance := NewBroker()
 	_instance.Cluster.Name = "devServer"
 
 	err := _instance.generateIDs()

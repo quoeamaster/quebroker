@@ -1,0 +1,90 @@
+syntax = "proto3";
+// explicit set the full package path for the generated class -> option go_package = "github.com/quoeamaster/quebroker/metastate";
+// protoc --go_out=plugins=grpc:metastate metastateService.proto
+option go_package = ".;metastate";
+package metastate;
+
+// initiate the election process by exchanging the ID and other information; 
+// every eligbible candidate will send out this request at a random interval within 2 seconds; 
+// hence theoretically there MUST be at least 1 pair of brokers doing the election eventually
+message ElectionRequest {
+   string brokerName = 1;
+   // basically requires ID to compare who is min; the min ID bared broker would be the elected PRIMARY
+   string brokerID = 2;    
+   string brokerAddr = 3;
+
+   // PS. assume the corresponding broker's config Bootstrap.initialPrimaryBrokersList are the same
+}
+
+// for eligible BUT not the winner (elected primary) broker(s); need to get the ACK from the elected primary;
+// by then the election really ends
+message ElectionDoneHandshakeRequest {
+   // primary - means the won / primary broker; needs ACK from the primary to END election
+   string primaryBrokerName = 1;
+   string primaryBrokerID = 2;
+   string primaryBrokerAddr = 3;
+
+   // src - means the current instance (which is not the winner)
+   string srcBrokerName = 10;
+   string srcBrokerID = 11;
+   string srcBrokerAddr = 12;
+}
+
+// response from the elected primary on confirming (ACK); election is DONE at this stage
+message ElectionDoneHandshakeACKResponse {
+   // status code: 200 - OK, 5XX - ERROR (e.g. 500 - internal error; 501 - meta state stale error etc)
+   int32 code = 1;
+}
+
+// Dummy can act as either an empty request or response (can replace this later on for real implementation if necessary...)
+// since there is NOTHING inside dummy, hence min overhead
+message Dummy {}
+
+
+// for non election eligible broker(s); asking the potential primary(s) on whether it could join the cluster.
+// also sniff back the elected primary's info
+message ClusterJoinRequest {
+   string brokerName = 1;
+   string brokerID = 2;    
+   string brokerAddr = 3;
+   // PS. all for elected Primary's housekeep purpose; the elected primary would 
+   // return its info in return (unless election not yet done)
+}
+
+// for non election eligible broker(s); got back the response / ACK. 
+// MUST check the status and see if any further ping(s) are required; check the inline DOC
+message ClusterJoinResponse {
+   // status of the response:
+   // 200 - OK + elected primary available (election done)
+   // 300 - in progress, election not yet done; re-ping again after an interval 
+   //    (e.g.) 5 ~ 10 seconds (can't continue till end of world; until election finally DONE)
+   // 5XX - some other error happened (each status has a reason stating why)
+   int32 status = 10;
+
+   string primaryBrokerName = 1;
+   string primaryBrokerID = 2;
+   string primaryBrokerAddr = 3;
+}
+
+
+// ------------------------------ //
+// ---   service declaration  --- //
+// ------------------------------ //
+
+service MetastateService {
+   // ping other eligible broker(s) for info to start election
+   rpc InitiateElectionRequest(ElectionRequest) returns (Dummy);
+
+   // for non winners, ping back the elected primary for ACK
+   rpc GetElectedPrimaryACK(ElectionDoneHandshakeRequest) returns (ElectionDoneHandshakeACKResponse);
+
+
+   /* -------------------------------------------- */
+   /*    non eligible brokers joining request      */
+   /* -------------------------------------------- */
+
+   // for non eligibe broker(s); initiate this request to join the Cluster
+   // MUST check the status returned to decide whether to resend join request again
+   rpc InitiateClusterJoin(ClusterJoinRequest) returns (ClusterJoinResponse);
+}
+

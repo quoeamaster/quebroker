@@ -17,6 +17,13 @@
 
 package metastate
 
+// during Election ping / dial; the max no. of retries is 50 time, roughly 1.5 minutes
+// (assume each connection ping / dial is based on a random interval within 2 seconds)
+const maxElectionDialRetrial = 50
+
+// each connection ping / dial is based on a random interval within 2 seconds (2000 ms)
+const intervalElectionDial = 2000
+
 const stateFilename = ".state" // the persisted state file's name
 // KeyStateVersion - the state(s) current version; for checking which broker's state is the most updated or
 //	simply would a diff be required (if 2 broker's state_version are different, should be the same - in sync)
@@ -24,3 +31,19 @@ const KeyStateVersion = "state_version"
 
 // KeyStateVersionID - the running number of the state version
 const KeyStateVersionID = "state_version_id"
+
+// KeyPrimaryBroker - stating if this broker instance is the PRIMARY (like commander of a team)
+// Primary broker is supposed to handle:
+// - initial writes (add, update, delete of queue messages)
+// - approve changes (like change in partition numbers of the queue / topic etc)
+// - decision making / coordination
+const KeyPrimaryBroker = "primary_broker"
+
+// KeyPrimaryBrokerName - the elected primary's name
+const KeyPrimaryBrokerName = "primary_broker_name"
+
+// KeyPrimaryBrokerID - the elected primary's ID
+const KeyPrimaryBrokerID = "primary_broker_id"
+
+// KeyPrimaryBrokerAddr - the elected primary's address (ip:port format)
+const KeyPrimaryBrokerAddr = "primary_broker_addr"

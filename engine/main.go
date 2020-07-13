@@ -23,8 +23,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/quoeamaster/quebroker"
+	"github.com/quoeamaster/quebroker/metastate"
 	"github.com/quoeamaster/quebroker/vision"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -57,9 +59,10 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	gRPCServer = grpc.NewServer()
 
 	// d. add back service bindings
-	// TODO: add back new service bindings
-	vision.RegisterVisionServiceServer(gRPCServer, broker.Vision)
-	log.WithFields(logrus.Fields{"vision": "service to retrieve stats of the broker"}).Info("[service registered]")
+	err = _setupServiceBindings(gRPCServer, broker)
+	if err != nil {
+		return
+	}
 
 	// y. start signal monitoring on terminate or interrupt
 	_signals := make(chan os.Signal, 1)
@@ -100,11 +103,45 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 
 	// z. start to serve (with all services registered)
 	log.Infof("[bootstrap broker] address: %v", tcpListener.Addr().String())
+	go func() {
+		log.Infof("[engine] forming cluster...")
+		_timer := time.NewTimer(2 * time.Second)
+		<-_timer.C
+		_clusterForming(broker)
+	}()
+
 	err1 = gRPCServer.Serve(tcpListener)
 	if err1 != nil {
 		err = fmt.Errorf("failed to start up the RPC server, reason %v", err1)
 		return
 	}
+	return
+}
+
+func _clusterForming(broker *quebroker.Broker) {
+	// PS. panic directly if met fatal exceptions
+	_t := time.NewTimer(2 * time.Second)
+	<-_t.C
+	// determine which process to employ
+	// a. if eligible for election => ClientInitElectionRequest()
+	// b. else => ClientInitClusterJoinRequest()
+	if broker.GetIsPrimaryCandidate() {
+		broker.MetaState.ClientInitElectionRequest()
+	} else {
+		broker.MetaState.ClientInitClusterJoinRequest()
+	}
+}
+
+// methd to setup all service bindings to the gRPC server
+func _setupServiceBindings(gRPCServer *grpc.Server, broker *quebroker.Broker) (err error) {
+	// TODO: add back new service bindings
+	// vision
+	vision.RegisterVisionServiceServer(gRPCServer, broker.Vision)
+	log.WithFields(logrus.Fields{"vision": "service to retrieve stats of the broker"}).Info("[service registered]")
+
+	// metastate
+	metastate.RegisterMetastateServiceServer(gRPCServer, broker.MetaState)
+	log.WithFields(logrus.Fields{"metastate": "service to handle cluster state management + cluster formation"}).Info("[service registered]")
 
 	return
 }

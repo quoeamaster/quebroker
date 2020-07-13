@@ -1,19 +1,25 @@
 # name of the broker (human readability)
 name = "broker_server_1"
 
-bootstrapServers = [ 
-    "http://localhost:6801", 
-    "http://localhost:6802" 
-]
-
+# connectable address for this broker instance
 [network]
 # 192.168.1.140
 hostname = "localhost"
 port = 6801
 
 [cluster]
+# cluster's name (brokers should only exist in 1 cluster based on the label/name)
 name = "devCluster"
 
+# paths for storing "data" or "log"
 [path]
 data = "${HOME}/data"
 log = "${HOME}/log"
+
+[bootstrap]
+# the brokers to handshake before joining; also acts as the list of initial candidates for the PRIMARY broker election
+# protocol is tcp (not http in general)
+initialPrimaryBrokersList = [ 
+    "localhost:6801", 
+    "localhost:6802" 
+]

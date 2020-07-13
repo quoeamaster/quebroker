@@ -23,15 +23,19 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/quoeamaster/quebroker/util"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 // Service - implementation of meta-state services
 type Service struct {
+	broker IBroker
 	log    *logrus.Logger
 	states map[string]interface{} // TODO: is a map enough??? need more features?
 
@@ -39,12 +43,13 @@ type Service struct {
 }
 
 // New - create instance of meta-state service
-func New(brokerHomeDir, brokerID string) (s *Service) {
+func New(brokerHomeDir string, broker IBroker) (s *Service) {
 	s = new(Service)
 	s.setupLogger()
+	s.broker = broker
 	// load or create a brand new "states"
 	s.states = make(map[string]interface{})
-	err := s._loadMetaStates(brokerHomeDir, brokerID)
+	err := s._loadMetaStates(brokerHomeDir, s.broker.GetBrokerID())
 	if err != nil {
 		panic(fmt.Errorf("meta-state service bootstrap failed, reason: %v", err))
 	}
@@ -84,7 +89,7 @@ func (s *Service) _loadMetaStates(brokerHomeDir, brokerID string) (err error) {
 			return err
 		}
 		// assume states (map) populated
-		s.log.Infof("states loaded: <%v>\n", s.states)
+		//s.log.Infof("states loaded: <%v>\n", s.states)
 	}
 	return
 }
@@ -210,3 +215,157 @@ func (s *Service) GetStateVersionID() interface{} {
 
 // TODO: json diff
 // TODO: provide a map with keys for updating (means multiple updates in one api call)
+
+/* -------------------------------- */
+/*		election APIs (server impl)	*/
+/* -------------------------------- */
+
+// InitiateElectionRequest - ping other eligible broker(s) for info to start election
+func (s *Service) InitiateElectionRequest(context context.Context, req *ElectionRequest) (res *Dummy, err error) {
+	return
+}
+
+// GetElectedPrimaryACK - for non winners, ping back the elected primary for ACK
+func (s *Service) GetElectedPrimaryACK(context context.Context, req *ElectionDoneHandshakeRequest) (res *ElectionDoneHandshakeACKResponse, err error) {
+	return
+}
+
+/* -------------------------------- */
+/*		election APIs (client impl)	*/
+/* -------------------------------- */
+
+// ClientInitElectionRequest - init the election request ...
+func (s *Service) ClientInitElectionRequest() {
+	_brokers := s.broker.GetBootstrapInitialPrimaryBrokersList()
+	_localAddr := s.broker.GetBrokerAddr()
+
+	// extreme case, only 1 entry and it yields the same address; this instance is the ELECTED primary!
+	if len(_brokers) == 1 && strings.Compare(_localAddr, _brokers[0]) == 0 {
+		s._updateToElectedMasterState()
+		return
+	}
+
+	_targetBrokers := make([]string, 0)
+	// remove the local addr one (no point to ping itself... right???)
+	for _, _addr := range _brokers {
+		if strings.Compare(_addr, _localAddr) != 0 {
+			_targetBrokers = append(_targetBrokers, _addr)
+		}
+	}
+	// another extreme case... the original contents of the bootstrap list WAS also the same as _localAddr
+	if len(_targetBrokers) == 0 {
+		s._updateToElectedMasterState()
+		return
+	}
+
+	// start the request polling
+	_srvs := make([]MetastateServiceClient, len(_targetBrokers))
+	_gConns := make([]*grpc.ClientConn, len(_targetBrokers))
+	_retry := 0
+	for true {
+		// primary elected + ACK received
+		if _, _, _, _found := s.GetElectedPrimaryBrokerInfo(); _found {
+			break
+		}
+		// extreme case, no other broker's available for ping / dial / connection
+		// so the local broker is the Elected Primary
+		if _retry >= maxElectionDialRetrial {
+			s._updateToElectedMasterState()
+			break
+		}
+
+		// _tBroker = the target broker's address
+		for i, _tBroker := range _targetBrokers {
+			// create connection and store it for re-use
+			_srv := _srvs[i]
+			if _srv == nil {
+				_gConn, err := grpc.Dial(_tBroker, grpc.WithInsecure())
+				if err != nil {
+					s.log.Warnf("[ClientInitElectionRequest] could not connect with [%v]\n", _tBroker)
+					continue
+				}
+				_srv = NewMetastateServiceClient(_gConn)
+				_srvs[i] = _srv
+				_gConns[i] = _gConn // required... as you need to clean up the ClientConn after election done
+			} // if (create grpc.ClientConn and set _srvs content)
+
+			// TODO: implement the server-side InitiElectionRequest too!
+			// TODO: the Timer random interval ~~~~~~~ DO it first~
+			_, err := _srv.InitiateElectionRequest(context.Background(), &ElectionRequest{
+				BrokerName: s.broker.GetBrokerName(),
+				BrokerID:   s.broker.GetBrokerID(),
+				BrokerAddr: _localAddr})
+			if err != nil {
+				// mostly unreachable scenarios (but not necessary to be an error, maybe the target broker not yet started up...)
+				s.log.Warnf("[ClientInitElectionRequest] initiate election request failed, reason: %v\n", err)
+				continue
+			}
+		}
+		// update the retry counter
+		_retry++
+	} // while true... loop with breaks
+
+	// cleanup
+	for _, _gConn := range _gConns {
+		if err2 := _gConn.Close(); err2 != nil {
+			s.log.Warnf("[ClientInitElectionRequest] try to close the corresponding grpc connection, but got exception with reason: [%v]\n", err2)
+		}
+	}
+	_gConns = nil
+	_srvs = nil
+
+	// ... anything else???
+
+}
+func (s *Service) _updateToElectedMasterState() {
+	_, err := s.Upsert(KeyPrimaryBroker, true, true, true)
+	if err != nil {
+		panic(fmt.Errorf("[clientInitElectionRequest] set meta state exception, reason: %v", err))
+	}
+	s.log.Infof("[_updateToElectedMasterState] TBD elected primary discovered, meta state as is: [%v]", s.states)
+}
+
+/* ----------------------------------------------- */
+/*		cluster forming / joining APIs (server impl)	*/
+/* ----------------------------------------------- */
+
+// InitiateClusterJoin - for non eligibe broker(s); initiate this request to join the Cluster
+// MUST check the status returned to decide whether to resend join request again
+func (s *Service) InitiateClusterJoin(context context.Context, req *ClusterJoinRequest) (res *ClusterJoinResponse, err error) {
+	return
+}
+
+func (s *Service) ClientInitClusterJoinRequest() {}
+
+// GetElectedPrimaryBrokerInfo - return the elected broker's ID, name, address if Election already DONE.
+func (s *Service) GetElectedPrimaryBrokerInfo() (ID, name, addr string, available bool) {
+	_val := s.states[KeyPrimaryBrokerID]
+	// not available (probably election not DONE or config issue hence no cluster formed yet...)
+	if _val != nil {
+		ID = _val.(string)
+		name = s.states[KeyPrimaryBrokerName].(string)
+		addr = s.states[KeyPrimaryBrokerAddr].(string)
+		available = true
+	}
+	return
+}
+
+/* -------------------------------------------------------------- */
+/*		interface with getters / setters										*/
+/*	[DOC] in order to avoid "cycle import"; use interface instead	*/
+/* -------------------------------------------------------------- */
+
+// IBroker - broker interface (avoiding import cycles)
+type IBroker interface {
+	GetConfig(key string) interface{}
+
+	GetBrokerID() string
+
+	IsElectedPrimaryBroker() bool
+
+	GetBootstrapInitialPrimaryBrokersList() []string
+
+	GetBrokerAddr() string
+
+	GetBrokerName() string
+}
