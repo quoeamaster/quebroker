@@ -34,6 +34,10 @@ message ElectionDoneHandshakeRequest {
 message ElectionDoneHandshakeACKResponse {
    // status code: 200 - OK, 5XX - ERROR (e.g. 500 - internal error; 501 - meta state stale error etc)
    int32 code = 1;
+   // primary broker's state version value; other brokers should use this value as their stateVersion
+   string stateVersion = 2;
+   // primary broker's state num value; other brokers should use this value as their state num
+   int32 stateNum = 3;
 }
 
 // Dummy can act as either an empty request or response (can replace this later on for real implementation if necessary...)

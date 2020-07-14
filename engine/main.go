@@ -91,21 +91,23 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	// 	1) is this broker PRIMARY (master); if so, it could update state-version and others etc
 	//		2) state-version should be related to timestamp and hence later versions of the state could be identified
 	//broker.MetaState.Upsert(metastate.KeyStateVersion, "temp-setup-value-100001")
-	_, err = broker.MetaState.UpsertInMem("testing-A", 1234567890)
-	_, _, err = broker.MetaState.UpsertStateVersionByPrimaryBroker()
-	log.Infof("[updated state version and ID] [%v] - num [%v]\n",
-		broker.MetaState.GetStateVersion(),
-		broker.MetaState.GetStateVersionID())
-	_, err = broker.MetaState.Upsert("testing-Z", "nice to have it persisted", true, false) // if last param is true... update state-version one more time
-	if err != nil {
-		return
-	}
+	/*
+		_, err = broker.MetaState.UpsertInMem("testing-A", 1234567890)
+		_, _, err = broker.MetaState.UpsertStateVersionByPrimaryBroker()
+		log.Infof("[updated state version and ID] [%v] - num [%v]\n",
+			broker.MetaState.GetStateVersion(),
+			broker.MetaState.GetStateVersionID())
+		_, err = broker.MetaState.Upsert("testing-Z", "nice to have it persisted", true, false) // if last param is true... update state-version one more time
+		if err != nil {
+			return
+		}
+	*/
 
 	// z. start to serve (with all services registered)
 	log.Infof("[bootstrap broker] address: %v", tcpListener.Addr().String())
 	go func() {
 		log.Infof("[engine] forming cluster...")
-		_timer := time.NewTimer(2 * time.Second)
+		_timer := time.NewTimer(1200 * time.Millisecond)
 		<-_timer.C
 		_clusterForming(broker)
 	}()

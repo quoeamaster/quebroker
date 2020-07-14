@@ -24,6 +24,12 @@ const maxElectionDialRetrial = 50
 // each connection ping / dial is based on a random interval within 2 seconds (2000 ms)
 const intervalElectionDial = 2000
 
+// ack response status 200 = OK
+const ackStatusCode200 = 200
+
+// ack response status 500 = generic server side error (no reason stated)
+const ackStatusCode500 = 500
+
 const stateFilename = ".state" // the persisted state file's name
 // KeyStateVersion - the state(s) current version; for checking which broker's state is the most updated or
 //	simply would a diff be required (if 2 broker's state_version are different, should be the same - in sync)
@@ -37,7 +43,7 @@ const KeyStateVersionID = "state_version_id"
 // - initial writes (add, update, delete of queue messages)
 // - approve changes (like change in partition numbers of the queue / topic etc)
 // - decision making / coordination
-const KeyPrimaryBroker = "primary_broker"
+const KeyPrimaryBroker = "is_primary_broker"
 
 // KeyPrimaryBrokerName - the elected primary's name
 const KeyPrimaryBrokerName = "primary_broker_name"
@@ -47,3 +53,6 @@ const KeyPrimaryBrokerID = "primary_broker_id"
 
 // KeyPrimaryBrokerAddr - the elected primary's address (ip:port format)
 const KeyPrimaryBrokerAddr = "primary_broker_addr"
+
+// KeyAvailableBrokers - the available brokers till now
+const KeyAvailableBrokers = "available_brokers"

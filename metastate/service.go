@@ -23,23 +23,25 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/quoeamaster/quebroker/util"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
 // Service - implementation of meta-state services
 type Service struct {
-	broker IBroker
-	log    *logrus.Logger
-	states map[string]interface{} // TODO: is a map enough??? need more features?
+	broker      IBroker
+	log         *logrus.Logger
+	states      map[string]interface{} // TODO: is a map enough??? need more features?
+	inMemStates map[string]interface{} // states that are volatile and never persisted
 
 	statePathOnDisk string // the location for R/W on states info
+
+	// lock for updating certain attributes
+	mux sync.Mutex
 }
 
 // New - create instance of meta-state service
@@ -53,6 +55,9 @@ func New(brokerHomeDir string, broker IBroker) (s *Service) {
 	if err != nil {
 		panic(fmt.Errorf("meta-state service bootstrap failed, reason: %v", err))
 	}
+	// init in-mem states
+	s.inMemStates = make(map[string]interface{})
+
 	return
 }
 
@@ -133,14 +138,20 @@ func (s *Service) _persist(updateStateVersion bool) (err error) {
 // UpsertInMem - update/insert based on the given key-value pair BUT does not persist to disk.
 // 	Handy for series based updates and the last item to update would call
 //		Upsert(string, interface{}, TRUE) to persist all changes to disk
-func (s *Service) UpsertInMem(key string, value interface{}) (original interface{}, err error) {
-	return s.Upsert(key, value, false, false)
+func (s *Service) UpsertInMem(key string, value interface{}, isVolatileState bool) (original interface{}, err error) {
+	return s.Upsert(key, value, false, false, isVolatileState)
 }
 
 // Upsert - update/insert based on the given key-value pair
-func (s *Service) Upsert(key string, value interface{}, needPersist bool, needStateVersionUpdate bool) (original interface{}, err error) {
+func (s *Service) Upsert(key string, value interface{}, needPersist bool, needStateVersionUpdate bool, isVolatileState bool) (original interface{}, err error) {
 	if key != "" && value != nil {
-		s.states[key] = value
+		if isVolatileState {
+			// non persistable states (e.g. is_primary_key), elected primary related attributes
+			s.inMemStates[key] = value
+		} else {
+			// persistable states (e.g. state version and ID), NON volatile after restart
+			s.states[key] = value
+		}
 	}
 	if needPersist {
 		s._persist(needStateVersionUpdate)
@@ -149,18 +160,22 @@ func (s *Service) Upsert(key string, value interface{}, needPersist bool, needSt
 }
 
 // UpsertSlice - update/insert based on the given key-value pair
-func (s *Service) UpsertSlice(key string, value interface{}) (original interface{}, err error) {
+func (s *Service) UpsertSlice(key string, value interface{}, isVolatileState bool) (original interface{}, err error) {
 	return
 }
 
 // UpsertMap - update/insert based on the given key-value pair
-func (s *Service) UpsertMap(key string, value interface{}) (original interface{}, err error) {
+func (s *Service) UpsertMap(key string, value interface{}, isVolatileState bool) (original interface{}, err error) {
 	return
 }
 
 // GetByKey - return the value under the given key
-func (s *Service) GetByKey(key string) (value interface{}) {
-	value = s.states[key]
+func (s *Service) GetByKey(key string) (value interface{}, isVolatileState bool) {
+	if isVolatileState {
+		value = s.inMemStates[key]
+	} else {
+		value = s.states[key]
+	}
 	return
 }
 
@@ -216,136 +231,30 @@ func (s *Service) GetStateVersionID() interface{} {
 // TODO: json diff
 // TODO: provide a map with keys for updating (means multiple updates in one api call)
 
-/* -------------------------------- */
-/*		election APIs (server impl)	*/
-/* -------------------------------- */
-
-// InitiateElectionRequest - ping other eligible broker(s) for info to start election
-func (s *Service) InitiateElectionRequest(context context.Context, req *ElectionRequest) (res *Dummy, err error) {
-	return
-}
-
-// GetElectedPrimaryACK - for non winners, ping back the elected primary for ACK
-func (s *Service) GetElectedPrimaryACK(context context.Context, req *ElectionDoneHandshakeRequest) (res *ElectionDoneHandshakeACKResponse, err error) {
-	return
-}
-
-/* -------------------------------- */
-/*		election APIs (client impl)	*/
-/* -------------------------------- */
-
-// ClientInitElectionRequest - init the election request ...
-func (s *Service) ClientInitElectionRequest() {
-	_brokers := s.broker.GetBootstrapInitialPrimaryBrokersList()
-	_localAddr := s.broker.GetBrokerAddr()
-
-	// extreme case, only 1 entry and it yields the same address; this instance is the ELECTED primary!
-	if len(_brokers) == 1 && strings.Compare(_localAddr, _brokers[0]) == 0 {
-		s._updateToElectedMasterState()
-		return
-	}
-
-	_targetBrokers := make([]string, 0)
-	// remove the local addr one (no point to ping itself... right???)
-	for _, _addr := range _brokers {
-		if strings.Compare(_addr, _localAddr) != 0 {
-			_targetBrokers = append(_targetBrokers, _addr)
-		}
-	}
-	// another extreme case... the original contents of the bootstrap list WAS also the same as _localAddr
-	if len(_targetBrokers) == 0 {
-		s._updateToElectedMasterState()
-		return
-	}
-
-	// start the request polling
-	_srvs := make([]MetastateServiceClient, len(_targetBrokers))
-	_gConns := make([]*grpc.ClientConn, len(_targetBrokers))
-	_retry := 0
-	for true {
-		// primary elected + ACK received
-		if _, _, _, _found := s.GetElectedPrimaryBrokerInfo(); _found {
-			break
-		}
-		// extreme case, no other broker's available for ping / dial / connection
-		// so the local broker is the Elected Primary
-		if _retry >= maxElectionDialRetrial {
-			s._updateToElectedMasterState()
-			break
-		}
-
-		// _tBroker = the target broker's address
-		for i, _tBroker := range _targetBrokers {
-			// create connection and store it for re-use
-			_srv := _srvs[i]
-			if _srv == nil {
-				_gConn, err := grpc.Dial(_tBroker, grpc.WithInsecure())
-				if err != nil {
-					s.log.Warnf("[ClientInitElectionRequest] could not connect with [%v]\n", _tBroker)
-					continue
-				}
-				_srv = NewMetastateServiceClient(_gConn)
-				_srvs[i] = _srv
-				_gConns[i] = _gConn // required... as you need to clean up the ClientConn after election done
-			} // if (create grpc.ClientConn and set _srvs content)
-
-			// TODO: implement the server-side InitiElectionRequest too!
-			// TODO: the Timer random interval ~~~~~~~ DO it first~
-			_, err := _srv.InitiateElectionRequest(context.Background(), &ElectionRequest{
-				BrokerName: s.broker.GetBrokerName(),
-				BrokerID:   s.broker.GetBrokerID(),
-				BrokerAddr: _localAddr})
-			if err != nil {
-				// mostly unreachable scenarios (but not necessary to be an error, maybe the target broker not yet started up...)
-				s.log.Warnf("[ClientInitElectionRequest] initiate election request failed, reason: %v\n", err)
-				continue
-			}
-		}
-		// update the retry counter
-		_retry++
-	} // while true... loop with breaks
-
-	// cleanup
-	for _, _gConn := range _gConns {
-		if err2 := _gConn.Close(); err2 != nil {
-			s.log.Warnf("[ClientInitElectionRequest] try to close the corresponding grpc connection, but got exception with reason: [%v]\n", err2)
-		}
-	}
-	_gConns = nil
-	_srvs = nil
-
-	// ... anything else???
-
-}
-func (s *Service) _updateToElectedMasterState() {
-	_, err := s.Upsert(KeyPrimaryBroker, true, true, true)
-	if err != nil {
-		panic(fmt.Errorf("[clientInitElectionRequest] set meta state exception, reason: %v", err))
-	}
-	s.log.Infof("[_updateToElectedMasterState] TBD elected primary discovered, meta state as is: [%v]", s.states)
-}
-
-/* ----------------------------------------------- */
-/*		cluster forming / joining APIs (server impl)	*/
-/* ----------------------------------------------- */
-
-// InitiateClusterJoin - for non eligibe broker(s); initiate this request to join the Cluster
-// MUST check the status returned to decide whether to resend join request again
-func (s *Service) InitiateClusterJoin(context context.Context, req *ClusterJoinRequest) (res *ClusterJoinResponse, err error) {
-	return
-}
-
-func (s *Service) ClientInitClusterJoinRequest() {}
-
 // GetElectedPrimaryBrokerInfo - return the elected broker's ID, name, address if Election already DONE.
+// Data within the IN-MEM states
 func (s *Service) GetElectedPrimaryBrokerInfo() (ID, name, addr string, available bool) {
-	_val := s.states[KeyPrimaryBrokerID]
+	_val := s.inMemStates[KeyPrimaryBrokerID]
 	// not available (probably election not DONE or config issue hence no cluster formed yet...)
 	if _val != nil {
 		ID = _val.(string)
-		name = s.states[KeyPrimaryBrokerName].(string)
-		addr = s.states[KeyPrimaryBrokerAddr].(string)
+		name = s.inMemStates[KeyPrimaryBrokerName].(string)
+		addr = s.inMemStates[KeyPrimaryBrokerAddr].(string)
 		available = true
+	}
+	return
+}
+
+// GetAvailableBrokersMap - return the map all available broker(s)
+func (s *Service) GetAvailableBrokersMap() (brokers map[string]BrokerMeta) {
+	_val := s.inMemStates[KeyAvailableBrokers]
+	if _val == nil {
+		// 1st time access or really no broker(s) available till now
+		brokers = make(map[string]BrokerMeta)
+		s.inMemStates[KeyAvailableBrokers] = brokers
+
+	} else {
+		brokers = _val.(map[string]BrokerMeta)
 	}
 	return
 }
@@ -361,11 +270,51 @@ type IBroker interface {
 
 	GetBrokerID() string
 
-	IsElectedPrimaryBroker() bool
+	//IsElectedPrimaryBroker() bool
 
 	GetBootstrapInitialPrimaryBrokersList() []string
 
 	GetBrokerAddr() string
 
 	GetBrokerName() string
+
+	String() string
+}
+
+// BrokerMeta - structure holding a valid Broker's meta information such as NAME, ID, addr, isPrimaryEligible etc
+type BrokerMeta struct {
+	name              string
+	id                string
+	addr              string
+	isPrimaryEligible bool
+}
+
+// GetName - return the broker name
+func (m *BrokerMeta) GetName() string {
+	return m.name
+}
+
+// GetID - return the broker ID
+func (m *BrokerMeta) GetID() string {
+	return m.id
+}
+
+// GetAddr - return the broker addr
+func (m *BrokerMeta) GetAddr() string {
+	return m.addr
+}
+
+// IsPrimaryEligible - return the broker 's election eligibility
+func (m *BrokerMeta) IsPrimaryEligible() bool {
+	return m.isPrimaryEligible
+}
+
+// IsBrokerMetaStructNil - checks whether the given BrokerMeta is nil / empty
+func IsBrokerMetaStructNil(val BrokerMeta) (isNil bool) {
+	if val.name == "" && val.id == "" && val.addr == "" && val.isPrimaryEligible == false {
+		isNil = true
+	} else {
+		isNil = false
+	}
+	return
 }

@@ -20,7 +20,6 @@ package quebroker
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/quoeamaster/quebroker/metastate"
 	"github.com/quoeamaster/quebroker/vision"
@@ -58,9 +57,6 @@ type Broker struct {
 		InitialPrimaryBrokersList []string `required:"true"`
 	}
 
-	// a lock for safe updates on certain attributes
-	mux sync.Mutex
-
 	// is this instance a potential PRIMARY (either elected or backup / potential)
 	isPrimaryCandidate int
 	// is this instance the ELECTED PRIMARY (elected or backup / potential)
@@ -81,8 +77,8 @@ func (b *Broker) String() string {
 
 	_b.WriteString("broker instance:\n")
 	_b.WriteString(fmt.Sprintf("  id [%v], name [%v]\n", b.ID, b.Name))
+	_b.WriteString(fmt.Sprintf("  is eligible for Primary Broker election? [%v], broker address [%v]\n", b.GetIsPrimaryCandidate(), b.GetBrokerAddr()))
 	_b.WriteString(fmt.Sprintf("  cluster.id [%v], cluster.name [%v]\n", b.Cluster.ID, b.Cluster.Name))
-	//_b.WriteString(fmt.Sprintf("  boostrap.server.list [%v] of size %v\n", b.BootstrapServers, len(b.BootstrapServers)))
 	_b.WriteString(fmt.Sprintf("  network.hostname [%v], network.port [%v]\n", b.Network.HostName, b.Network.Port))
 	_b.WriteString(fmt.Sprintf("  path.data [%v], path.log [%v]\n", b.Path.Data, b.Path.Log))
 	_b.WriteString(fmt.Sprintf("  bootstrap.initialPrimaryBrokersList [%v] of size [%v]\n",
@@ -103,14 +99,15 @@ func NewBroker() (instance *Broker) {
 func (b *Broker) GetIsPrimaryCandidate() (isPrimary bool) {
 	// not yet check (1st time check)
 	if b.isPrimaryCandidate == -1 {
-		_addr := fmt.Sprintf("%v:%v", b.Network.HostName, b.Network.Port)
+		//_addr := fmt.Sprintf("%v:%v", b.Network.HostName, b.Network.Port)
+		_addr := b.GetBrokerAddr()
 		for _, iPrimary := range b.Bootstrap.InitialPrimaryBrokersList {
 			if strings.Compare(iPrimary, _addr) == 0 {
 				b.isPrimaryCandidate = 1
 				break
 			}
 		}
-		// not a single match found with the initial possible PRIMARY broker(s)
+		// not a single match found within the initial possible PRIMARY broker(s)
 		if b.isPrimaryCandidate == -1 {
 			b.isPrimaryCandidate = 0
 		}
@@ -155,6 +152,7 @@ func (b *Broker) GetBrokerID() (value string) {
 
 // IsElectedPrimaryBroker - whether this broker instance is ELECTED primary broker
 // threadSafe
+/*
 func (b *Broker) IsElectedPrimaryBroker() bool {
 	b.mux.Lock()
 	defer b.mux.Unlock()
@@ -168,6 +166,7 @@ func (b *Broker) IsElectedPrimaryBroker() bool {
 		return false
 	}
 }
+*/
 
 // GetBootstrapInitialPrimaryBrokersList - return the bootstrap broker list
 func (b *Broker) GetBootstrapInitialPrimaryBrokersList() []string {
