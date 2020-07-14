@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -307,6 +308,54 @@ func (m *BrokerMeta) GetAddr() string {
 // IsPrimaryEligible - return the broker 's election eligibility
 func (m *BrokerMeta) IsPrimaryEligible() bool {
 	return m.isPrimaryEligible
+}
+
+// SerializeToString - serialize content to string
+func (m *BrokerMeta) SerializeToString() string {
+	var _s strings.Builder
+	_s.WriteString("id:")
+	_s.WriteString(m.id)
+	_s.WriteString(";")
+
+	_s.WriteString("name:")
+	_s.WriteString(m.name)
+	_s.WriteString(";")
+
+	_s.WriteString("addr:")
+	_s.WriteString(m.addr)
+	_s.WriteString(";")
+
+	_s.WriteString("isPrimaryEligible:")
+	_s.WriteString(fmt.Sprintf("%v", m.isPrimaryEligible))
+	//_s.WriteString(";")
+
+	return _s.String()
+}
+
+// DeserializeFromString - deserialize and set values back to the BrokerMeta instance
+func (m *BrokerMeta) DeserializeFromString(val string) (err error) {
+	if val == "" {
+		err = fmt.Errorf("[DeserializeFromString] empty string to deserialized~")
+		return
+	}
+	_parts := strings.Split(val, ";")
+	for _, _part := range _parts {
+		_kv := strings.Split(_part, ":")
+		if strings.Compare(_kv[0], "id") == 0 {
+			m.id = _kv[1]
+		} else if strings.Compare(_kv[0], "name") == 0 {
+			m.name = _kv[1]
+		} else if strings.Compare(_kv[0], "addr") == 0 {
+			m.addr = _kv[1]
+		} else if strings.Compare(_kv[0], "isPrimaryEligible") == 0 {
+			if strings.Compare(_kv[1], "true") == 0 {
+				m.isPrimaryEligible = true
+			} else {
+				m.isPrimaryEligible = false
+			}
+		}
+	} // for (kv parts)
+	return
 }
 
 // IsBrokerMetaStructNil - checks whether the given BrokerMeta is nil / empty

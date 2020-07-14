@@ -24,11 +24,23 @@ const maxElectionDialRetrial = 50
 // each connection ping / dial is based on a random interval within 2 seconds (2000 ms)
 const intervalElectionDial = 2000
 
+// each connection ping / dial is based on a random interval within 5 seconds (2000 ms)
+const intervalJoinClusterDial = 5000
+
 // ack response status 200 = OK
 const ackStatusCode200 = 200
 
 // ack response status 500 = generic server side error (no reason stated)
 const ackStatusCode500 = 500
+
+// join status 200 -> ok, all done
+const joinStatusCode200 = 200
+
+// join status code 300 -> in progress; primary broker not elected yet
+const joinStatusCode300 = 300
+
+// join status code 500 -> general server side error (no specific reason stated)
+const joinStatusCode500 = 500
 
 const stateFilename = ".state" // the persisted state file's name
 // KeyStateVersion - the state(s) current version; for checking which broker's state is the most updated or

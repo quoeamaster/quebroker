@@ -68,6 +68,10 @@ message ClusterJoinResponse {
    string primaryBrokerName = 1;
    string primaryBrokerID = 2;
    string primaryBrokerAddr = 3;
+
+   // all available brokers map in a []string (string-serialized) format 
+   // (need to rebuild this to a real golang map later on through deserialization)
+   repeated string brokersMap = 5;
 }
 
 

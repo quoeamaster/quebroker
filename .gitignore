@@ -24,3 +24,5 @@ broker.id
 script/*
 scripts/*
 
+# integration test - multi broker configs
+engine/config/*
