@@ -43,6 +43,9 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 
 	// compare the IDs and the min one wins and became the new Primary broker
 	_win := false
+	// TODO: add the logic to check whether Primary Broker has already been ELECTED before doing the ID comparison
+	// if priamry available => do a broadcast instead (since every [ hm... ?? primary eligible] broker will know you have joined)
+
 	_compResult := strings.Compare(s.broker.GetBrokerID(), req.GetBrokerID())
 
 	if _compResult < 0 {
@@ -485,17 +488,17 @@ func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastR
 	res = new(BroadcastResponse)
 	res.Status = broadcastStatusCode200
 
-	// a. determine what to update
-	if req.GetIsPrimaryReElected() {
+	// a1. determine what to update; re-elected primary OR
+	// a2. is primary info NOT exists in this broker???
+	if req.GetIsPrimaryReElected() || !_avail {
 		s._updateReElectedPrimaryInMem(req.GetPrimaryBroker().GetId(), req.GetPrimaryBroker().GetName(), req.GetPrimaryBroker().GetAddr(), false)
 	}
+
 	// b. update also the meta states
 	_mState := make(map[string]interface{})
 	err = json.Unmarshal([]byte(req.GetMetaStateInJson()), &_mState)
 	if err != nil {
-		if _avail {
-			s._updateReElectedPrimaryInMem(_id, _name, _addr, false)
-		}
+		s._updateReElectedPrimaryInMem(_id, _name, _addr, false)
 		res.Status = broadcastStatusCode500
 		return
 	}
@@ -561,13 +564,11 @@ func (s *Service) _broadcastToTargetBroker(addr string, isPrimaryReElected bool)
 
 	// prepare params
 	var _pBroker *BrokerInstance
-	if isPrimaryReElected {
-		if id, name, addr, avail := s.GetElectedPrimaryBrokerInfo(); avail {
-			_pBroker = &BrokerInstance{
-				Id:   id,
-				Name: name,
-				Addr: addr,
-			}
+	if id, name, addr, avail := s.GetElectedPrimaryBrokerInfo(); avail {
+		_pBroker = &BrokerInstance{
+			Id:   id,
+			Name: name,
+			Addr: addr,
 		}
 	}
 	bMetaJSON, err := json.Marshal(s.states)
