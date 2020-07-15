@@ -19,6 +19,7 @@ package metastate
 
 import (
 	context "context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -34,6 +35,9 @@ import (
 
 // InitiateElectionRequest - ping other eligible broker(s) for info to start election
 func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequest) (res *Dummy, err error) {
+	// must init a valid instance of Dummy struct
+	res = &Dummy{}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -57,6 +61,7 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 		// update this broker's primary states
 		s.UpsertInMem(KeyPrimaryBroker, true, true)
 		s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
+		// TODO: trigger the broadcast here after a throttle e.g. 2 seconds ~~~ NOW
 
 	} else {
 		// - lose
@@ -70,6 +75,7 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 			return
 		}
 		_srv := NewMetastateServiceClient(_gConn)
+		//s.log.Warnf("[InitiateElectionRequest] ** srv created , before calling GetACK %v, req [%v], current broker ID, name %v, %v\n", _srv, req, s.broker.GetBrokerID(), s.broker.GetBrokerName())
 		_resp, err3 := _srv.GetElectedPrimaryACK(context.Background(), &ElectionDoneHandshakeRequest{
 			PrimaryBrokerID:   req.GetBrokerID(),
 			PrimaryBrokerName: req.GetBrokerName(),
@@ -83,6 +89,7 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 			err = err3
 			return
 		}
+		//s.log.Warnf("[InitiateElectionRequest] ACK response %v\n", _resp)
 		// validate the response and update the state's elected primary attributes
 		if _resp.Code == ackStatusCode200 {
 			// update this broker's primary states
@@ -100,7 +107,8 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 			return
 		}
 	}
-	s.log.Infof("[InitiateElectionRequest] finally ... state [%v] vs in-mem state [%v]\n", s.states, s.inMemStates)
+	s.log.Infof("[InitiateElectionRequest] finally ... state [%v] vs in-mem state [%v], available broker map: {%v}\n",
+		s.states, s.inMemStates, s.GetAvailableBrokersMap())
 	return
 }
 
@@ -117,6 +125,17 @@ func (s *Service) GetElectedPrimaryACK(context context.Context, req *ElectionDon
 			addr:              req.SrcBrokerAddr,
 			isPrimaryEligible: true,
 		}
+		s.log.Debugf("[GetElectedPrimaryACK] updated brokers list %v\n", s.GetAvailableBrokersMap())
+	}
+	// a2. is this instance's elected primary attributes set?
+	if _, _, _, avail := s.GetElectedPrimaryBrokerInfo(); !avail {
+		s.mux.Lock()
+		// this broker instance is winner (for sure); only winner can send out ACK (state version also updated)
+		s.UpsertInMem(KeyPrimaryBroker, true, true)
+		s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
+		s.log.Debugf("[GetElectedPrimaryACK] updated winner broker to Elected primary")
+
+		s.mux.Unlock()
 	}
 
 	// b. return ACK Response
@@ -126,6 +145,8 @@ func (s *Service) GetElectedPrimaryACK(context context.Context, req *ElectionDon
 		StateVersion: s.GetStateVersion(),
 		StateNum:     int32(_stateNum),
 	}
+	//s.log.Warnf("[GetElectedPrimaryACK] ** %v\n", res)
+
 	return
 }
 
@@ -292,6 +313,8 @@ func (s *Service) InitiateClusterJoin(ctx context.Context, req *ClusterJoinReque
 			res.Stateversion = _resp.GetStateversion()
 			res.BrokersMap = _resp.GetBrokersMap()
 
+			// TODO: trigger a broadcast to primary eligible brokers
+
 		} else if _resp.GetStatus() == fwdStatusCode500 {
 			// error
 			res.Status = _resp.GetStatus()
@@ -454,6 +477,155 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 // (basically to primary eligible brokers, as they are backups for being primary election when necessary)
 // (exception is when the primary broker has been re-elected; then all available brokers MUST be broadcasted / informed)
 func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastRequest) (res *BroadcastResponse, err error) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	// original primary broker info (on failure reset)
+	_id, _name, _addr, _avail := s.GetElectedPrimaryBrokerInfo()
+	res = new(BroadcastResponse)
+	res.Status = broadcastStatusCode200
+
+	// a. determine what to update
+	if req.GetIsPrimaryReElected() {
+		s._updateReElectedPrimaryInMem(req.GetPrimaryBroker().GetId(), req.GetPrimaryBroker().GetName(), req.GetPrimaryBroker().GetAddr(), false)
+	}
+	// b. update also the meta states
+	_mState := make(map[string]interface{})
+	err = json.Unmarshal([]byte(req.GetMetaStateInJson()), &_mState)
+	if err != nil {
+		if _avail {
+			s._updateReElectedPrimaryInMem(_id, _name, _addr, false)
+		}
+		res.Status = broadcastStatusCode500
+		return
+	}
+	// TODO: check whether which part of the states should be modified...
+	s.states[KeyAvailableBrokers] = _mState[KeyAvailableBrokers]
+
+	// c. update the state's version
+	s.Upsert(KeyStateVersion, req.Stateversion.GetStateVersion(), false, false, false)
+	s.Upsert(KeyStateVersionID, fmt.Sprintf("%v", req.Stateversion.GetStateNum()), true, false, false)
+
+	return
+}
+
+/* -------------------------------------------------------- */
+/*    forward to Elected Primary request(s) (client impl)	*/
+/* -------------------------------------------------------- */
+
+// initBroadcastMetaStateUpdates -
+func (s *Service) initBroadcastMetaStateUpdates(isPrimaryEligiblesOnly bool, isPrimaryReElected bool) {
+	// a. only Elected Primary can do such broadcast
+	if _, _, _, avail := s.GetElectedPrimaryBrokerInfo(); !avail {
+		s.log.Infof("[initBroadcastMetaStateUpdates] cluster not ready yet, Primary Election not yet done")
+		return
+	} else if isP := s.inMemStates[KeyPrimaryBroker]; isP != nil && isP.(bool) == false {
+		s.log.Warnf("[initBroadcastMetaStateUpdates] trying to init a broadcast on a NON elected primary broker %v\n", s.broker.GetBrokerID())
+		return
+	}
+	// b. prepare the broadcast target broker addr(s) //tBrokers := make([]string, 0)
+	for _, tBroker := range s.GetAvailableBrokersMap() {
+		_needBCast := false
+		if isPrimaryEligiblesOnly && tBroker.IsPrimaryEligible() {
+			_needBCast = true
+			//tBrokers = append(tBrokers, tBroker.GetAddr())
+		} else {
+			_needBCast = true
+			//tBrokers = append(tBrokers, tBroker.GetAddr())
+		}
+		if _needBCast {
+			// goroutine / thread
+			go func() {
+				_isOffline, err1 := s._broadcastToTargetBroker(tBroker.GetAddr(), isPrimaryReElected)
+				if err1 != nil {
+					s.log.Warnf("[initBroadcastMetaStateUpdates] target broker (%v) cannot be connected, reason: %v\n", tBroker.GetAddr(), err1)
+				}
+				// marke offline => would trigger another round of broadcast though
+				if _isOffline {
+					s.markOfflineForBroker(tBroker.GetID(), tBroker.GetAddr())
+				}
+			}()
+		}
+	}
+
+}
+
+// _broadcastToTargetBroker - method to broadcast to a list of broker(s)
+func (s *Service) _broadcastToTargetBroker(addr string, isPrimaryReElected bool) (isBrokerOffline bool, err error) {
+	_gConn, err := grpc.Dial(addr, grpc.WithInsecure())
+	defer _gConn.Close()
+	if err != nil {
+		return
+	}
+	srv := NewMetastateServiceClient(_gConn)
+
+	// prepare params
+	var _pBroker *BrokerInstance
+	if isPrimaryReElected {
+		if id, name, addr, avail := s.GetElectedPrimaryBrokerInfo(); avail {
+			_pBroker = &BrokerInstance{
+				Id:   id,
+				Name: name,
+				Addr: addr,
+			}
+		}
+	}
+	bMetaJSON, err := json.Marshal(s.states)
+	if err != nil {
+		return
+	}
+	bInMemMetaJSON, err := json.Marshal(s.inMemStates)
+	if err != nil {
+		return
+	}
+	_stateV := new(StateVersionInfo)
+	_stateV.StateVersion = s.GetStateVersion()
+	_sNum, err := strconv.Atoi(s.GetStateVersionID().(string))
+	_stateV.StateNum = int32(_sNum)
+
+	_bcastSuccess := false
+	// 3 times of retrial (each retrial is 1.5 seconds) roughly within 5 seconds will know if a broker is offline or not
+	for i := 0; i < maxBroadcastRetrial; i++ {
+		_resp, err := srv.BroadcastMetaStateUpdates(context.Background(), &BroadcastRequest{
+			IsPrimaryReElected:   isPrimaryReElected,
+			PrimaryBroker:        _pBroker,
+			MetaStateInJson:      string(bMetaJSON),
+			InMemMetaStateInJson: string(bInMemMetaJSON),
+			Stateversion:         _stateV,
+		})
+		if err != nil {
+			// connectivity issue maybe
+			s.log.Warnf("[_broadcastToTargetBroker] broadcast failed, reason: %v\n", err)
+			// throttle 1.5s
+			<-time.NewTimer(intervalBroadcastDial * time.Millisecond).C
+			continue
+		}
+		// check response
+		if _resp.Status == broadcastStatusCode200 {
+			_bcastSuccess = true
+			break
+		} else {
+			// error of any type
+			s.log.Warnf("[_broadcastToTargetBroker] broadcast failed with status %v\n", _resp.Status)
+			// retry - throttle 1.5s
+			<-time.NewTimer(intervalBroadcastDial * time.Millisecond).C
+			continue
+		}
+	}
+	// at least broadcast once with success?
+	if !_bcastSuccess {
+		isBrokerOffline = true
+		err = fmt.Errorf("[_broadcastToTargetBroker] target broker (%v) is not reachable or broadcast failed to it, MARK-OFFLINE", addr)
+	}
+	return
+}
+
+func (s *Service) markOfflineForBroker(brokerID string, brokerAddr string) (err error) {
+	// mark offline would trigger another broadcast though
+
+	s.log.Warnf("*** TBD targeted broker: %v - %v", brokerID, brokerAddr)
+
+	// TODO: receiver side would need to compare the state version number and decide to update or not (stale state due to network latency)
 	return
 }
 
@@ -499,6 +671,14 @@ func (s *Service) _updateElectionWonInMemStates(brokerID, brokerName, brokerAddr
 	s.UpsertInMem(KeyPrimaryBrokerID, brokerID, true)
 	s.UpsertInMem(KeyPrimaryBrokerName, brokerName, true)
 	s.Upsert(KeyPrimaryBrokerAddr, brokerAddr, true, true, true)
+}
+
+// update primary broker inform in in-mem state; depends on needPersist param to persist
+// no stateVersion updated AND changes are only to the in-mem state (not persistable state)
+func (s *Service) _updateReElectedPrimaryInMem(brokerID, brokerName, brokerAddr string, needPersist bool) {
+	s.UpsertInMem(KeyPrimaryBrokerID, brokerID, true)
+	s.UpsertInMem(KeyPrimaryBrokerName, brokerName, true)
+	s.Upsert(KeyPrimaryBrokerAddr, brokerAddr, needPersist, false, true)
 }
 
 // create a random timer to throttle the ping / dial / connection

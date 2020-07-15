@@ -22,8 +22,14 @@ package metastate
 // TODO: should be 50 for production -> const maxElectionDialRetrial = 50
 const maxElectionDialRetrial = 30
 
+// if broadcast requests failed, max retry 3 times ONLY and then mark offline the problematic broker
+const maxBroadcastRetrial = 3
+
 // each connection ping / dial is based on a random interval within 2 seconds (2000 ms)
 const intervalElectionDial = 2000
+
+// each broadcast retry within 1500ms
+const intervalBroadcastDial = 1500
 
 // each connection ping / dial is based on a random interval within 5 seconds (2000 ms)
 const intervalJoinClusterDial = 5000
@@ -48,6 +54,12 @@ const fwdStatusCode200 = 200
 
 // forward request / response code 500 -> general server error
 const fwdStatusCode500 = 500
+
+// broadcast status code 200 - OK
+const broadcastStatusCode200 = 200
+
+// broadcast status code 500 - general server error
+const broadcastStatusCode500 = 500
 
 const stateFilename = ".state" // the persisted state file's name
 // KeyStateVersion - the state(s) current version; for checking which broker's state is the most updated or

@@ -119,6 +119,9 @@ message BroadcastRequest {
 
    // the serialized - JSON format of the meta-state contents
    string metaStateInJson = 3;
+   // the serialized - JSON format of the in-mem meta-state contents 
+   // (note that not everything in the in-mem JSON is re-usable)
+   string inMemMetaStateInJson = 4;
 
    // state version
    StateVersionInfo stateversion = 5;
