@@ -120,10 +120,11 @@ func (s *Service) GetElectedPrimaryACK(context context.Context, req *ElectionDon
 	}
 
 	// b. return ACK Response
+	_stateNum, err := strconv.Atoi(s.GetStateVersionID().(string))
 	res = &ElectionDoneHandshakeACKResponse{
 		Code:         int32(ackStatusCode200),
 		StateVersion: s.GetStateVersion(),
-		StateNum:     s.GetStateVersionID().(int32),
+		StateNum:     int32(_stateNum),
 	}
 	return
 }
@@ -161,6 +162,17 @@ func (s *Service) ClientInitElectionRequest() {
 	// start the request polling
 	_srvs := make([]MetastateServiceClient, len(_targetBrokers))
 	_gConns := make([]*grpc.ClientConn, len(_targetBrokers))
+	defer func() {
+		for _, _gConn := range _gConns {
+			if _gConn != nil {
+				if err2 := _gConn.Close(); err2 != nil {
+					s.log.Warnf("[ClientInitElectionRequest] try to close the corresponding grpc connection, but got exception with reason: [%v]\n", err2)
+				}
+			}
+		}
+		_gConns = nil
+		_srvs = nil
+	}()
 	_retry := 0
 	for true {
 		// primary elected + ACK received
@@ -210,15 +222,6 @@ func (s *Service) ClientInitElectionRequest() {
 		}
 		_retry++ // update the retry counter
 	}
-
-	// cleanup
-	for _, _gConn := range _gConns {
-		if err2 := _gConn.Close(); err2 != nil {
-			s.log.Warnf("[ClientInitElectionRequest] try to close the corresponding grpc connection, but got exception with reason: [%v]\n", err2)
-		}
-	}
-	_gConns = nil
-	_srvs = nil
 
 	// ... anything else???
 }
