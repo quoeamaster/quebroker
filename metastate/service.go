@@ -358,6 +358,11 @@ func (m *BrokerMeta) DeserializeFromString(val string) (err error) {
 	return
 }
 
+// String - return a string presentation on the BrokerMeta instance
+func (m *BrokerMeta) String() string {
+	return m.SerializeToString()
+}
+
 // IsBrokerMetaStructNil - checks whether the given BrokerMeta is nil / empty
 func IsBrokerMetaStructNil(val BrokerMeta) (isNil bool) {
 	if val.name == "" && val.id == "" && val.addr == "" && val.isPrimaryEligible == false {

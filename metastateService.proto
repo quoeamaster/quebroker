@@ -64,16 +64,71 @@ message ClusterJoinResponse {
    //    (e.g.) 5 ~ 10 seconds (can't continue till end of world; until election finally DONE)
    // 5XX - some other error happened (each status has a reason stating why)
    int32 status = 10;
-
-   string primaryBrokerName = 1;
-   string primaryBrokerID = 2;
-   string primaryBrokerAddr = 3;
-
+   // primary broker information
+   BrokerInstance primaryBroker = 1;
+   
    // all available brokers map in a []string (string-serialized) format 
    // (need to rebuild this to a real golang map later on through deserialization)
    repeated string brokersMap = 5;
+
+   // state version
+   StateVersionInfo stateversion = 15;
 }
 
+// re-usable message representing a broker
+message BrokerInstance {
+   string id = 1;
+   string name = 2;
+   string addr = 3;
+}
+
+// re-usable message representing a stateversion and stateId pair 
+// (usually sent by Elected Primary broker in operations)
+message StateVersionInfo {
+   // meta state version
+   string stateVersion = 1;
+   // meta state id / num (running number)
+   int32 stateNum = 2;
+}
+
+// forward cluster join request by any broker (usually the eligible brokers, but not the ELECTED primary)
+message ForwardClusterJoinRequest {
+   // request / src broker
+   BrokerInstance broker = 1;
+   // is this broker eligible for election?
+   bool isPrimaryEligible = 2;
+}
+
+// forward cluster join response
+message ForwardClusterJoinResponse {
+   // status indicating the progress; 200 - OK, 500 - General server error
+   int32 status = 1;
+   // a list of serialized broker information (all available brokers at this moment)
+   repeated string brokersMap = 2;
+
+   // meta state version
+   StateVersionInfo stateversion = 5;
+}
+
+// request containing info for meta state updates
+message BroadcastRequest {
+   // is the primary broker re-elected?
+   bool isPrimaryReElected = 1;
+   // the primary broker's info (only useful when the isPrimaryReElected is true)
+   BrokerInstance primaryBroker = 2;
+
+   // the serialized - JSON format of the meta-state contents
+   string metaStateInJson = 3;
+
+   // state version
+   StateVersionInfo stateversion = 5;
+}
+
+// response to the meta state updates / broadcast
+message BroadcastResponse {
+   // status indicating the broadcast operation; 200 - OK, 500 - general server error etc
+   int32 status = 1;
+}
 
 // ------------------------------ //
 // ---   service declaration  --- //
@@ -94,5 +149,19 @@ service MetastateService {
    // for non eligibe broker(s); initiate this request to join the Cluster
    // MUST check the status returned to decide whether to resend join request again
    rpc InitiateClusterJoin(ClusterJoinRequest) returns (ClusterJoinResponse);
+
+
+   /* -------------------------------------------- */
+   /*    forward to Elected Primary request(s)     */
+   /* -------------------------------------------- */
+
+   // from eligible brokers, forwarding to the Elected Primary broker for updates on meta-state
+   rpc ForwardClusterJoin(ForwardClusterJoinRequest) returns (ForwardClusterJoinResponse);
+
+   // broadcast meta state updates to targeted brokers 
+   // (basically to primary eligible brokers, as they are backups for being primary election when necessary)
+   // (exception is when the primary broker has been re-elected; then all available brokers MUST be broadcasted / informed)
+   rpc BroadcastMetaStateUpdates(BroadcastRequest) returns (BroadcastResponse);
+
 }
 

@@ -19,7 +19,8 @@ package metastate
 
 // during Election ping / dial; the max no. of retries is 50 time, roughly 1.5 minutes
 // (assume each connection ping / dial is based on a random interval within 2 seconds)
-const maxElectionDialRetrial = 50
+// TODO: should be 50 for production -> const maxElectionDialRetrial = 50
+const maxElectionDialRetrial = 30
 
 // each connection ping / dial is based on a random interval within 2 seconds (2000 ms)
 const intervalElectionDial = 2000
@@ -41,6 +42,12 @@ const joinStatusCode300 = 300
 
 // join status code 500 -> general server side error (no specific reason stated)
 const joinStatusCode500 = 500
+
+// forward request / response code 200 -> OK
+const fwdStatusCode200 = 200
+
+// forward request / response code 500 -> general server error
+const fwdStatusCode500 = 500
 
 const stateFilename = ".state" // the persisted state file's name
 // KeyStateVersion - the state(s) current version; for checking which broker's state is the most updated or
