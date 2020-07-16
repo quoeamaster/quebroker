@@ -20,7 +20,8 @@ package metastate
 // during Election ping / dial; the max no. of retries is 50 time, roughly 1.5 minutes
 // (assume each connection ping / dial is based on a random interval within 2 seconds)
 // TODO: should be 50 for production -> const maxElectionDialRetrial = 50
-const maxElectionDialRetrial = 30
+// 30
+const maxElectionDialRetrial = 5
 
 // if broadcast requests failed, max retry 3 times ONLY and then mark offline the problematic broker
 const maxBroadcastRetrial = 3

@@ -38,14 +38,24 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 	// must init a valid instance of Dummy struct
 	res = &Dummy{}
 
+	// add the logic to check whether Primary Broker has already been ELECTED before doing the ID comparison
+	// if priamry available => do a broadcast instead (since every [ hm... ?? primary eligible] broker will know you have joined)
+	if _, _, _, avail := s.GetElectedPrimaryBrokerInfo(); avail {
+		// update the brokersMap to add in this instance too
+		s._upsertBrokerToBrokersMap(req.BrokerID, req.BrokerName, req.BrokerAddr, true)
+
+		s.log.Info("[InitiateElectionRequest] broadcast sent to brokers since Primary Broker already ELECTED")
+		s.initBroadcastMetaStateUpdates(false, false)
+		// throttle the election interval (to reduce number of unecessary broadcast)
+		<-time.NewTimer(intervalElectionDial * time.Millisecond).C
+		return
+	}
+
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
 	// compare the IDs and the min one wins and became the new Primary broker
 	_win := false
-	// TODO: add the logic to check whether Primary Broker has already been ELECTED before doing the ID comparison
-	// if priamry available => do a broadcast instead (since every [ hm... ?? primary eligible] broker will know you have joined)
-
 	_compResult := strings.Compare(s.broker.GetBrokerID(), req.GetBrokerID())
 
 	if _compResult < 0 {
@@ -166,6 +176,7 @@ func (s *Service) ClientInitElectionRequest() {
 	if len(_brokers) == 1 && strings.Compare(_localAddr, _brokers[0]) == 0 {
 		s._updateToElectedMasterState()
 		s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
+		s.log.Infof("[ClientInitElectionRequest] Primary Election Done: {%v}\n", s._infoLogBrokersStatus())
 		return
 	}
 
@@ -180,6 +191,7 @@ func (s *Service) ClientInitElectionRequest() {
 	if len(_targetBrokers) == 0 {
 		s._updateToElectedMasterState()
 		s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
+		s.log.Infof("[ClientInitElectionRequest] Primary Election Done: {%v}\n", s._infoLogBrokersStatus())
 		return
 	}
 
@@ -203,6 +215,7 @@ func (s *Service) ClientInitElectionRequest() {
 		s.mux.Lock()
 		if _, _, _, _found := s.GetElectedPrimaryBrokerInfo(); _found {
 			s.mux.Unlock()
+			s.log.Infof("[ClientInitElectionRequest] Primary Election Done: {%v}\n", s._infoLogBrokersStatus())
 			break
 		}
 		s.mux.Unlock()
@@ -212,6 +225,7 @@ func (s *Service) ClientInitElectionRequest() {
 		if _retry >= maxElectionDialRetrial {
 			s._updateToElectedMasterState()
 			s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
+			s.log.Infof("[ClientInitElectionRequest] Primary Election Done: {%v}\n", s._infoLogBrokersStatus())
 			break
 		}
 
@@ -491,6 +505,7 @@ func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastR
 	// a1. determine what to update; re-elected primary OR
 	// a2. is primary info NOT exists in this broker???
 	if req.GetIsPrimaryReElected() || !_avail {
+		s.log.Debugf("[BroadcastMetaStateUpdates] need to update primary broker info: broker info exists? => %v OR is a New Primary broker elected? => %v\n", _avail, req.GetIsPrimaryReElected())
 		s._updateReElectedPrimaryInMem(req.GetPrimaryBroker().GetId(), req.GetPrimaryBroker().GetName(), req.GetPrimaryBroker().GetAddr(), false)
 	}
 
@@ -503,7 +518,7 @@ func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastR
 		return
 	}
 	// TODO: check whether which part of the states should be modified...
-	s.states[KeyAvailableBrokers] = _mState[KeyAvailableBrokers]
+	s.inMemStates[KeyAvailableBrokers] = _mState[KeyAvailableBrokers]
 
 	// c. update the state's version
 	s.Upsert(KeyStateVersion, req.Stateversion.GetStateVersion(), false, false, false)
@@ -527,16 +542,20 @@ func (s *Service) initBroadcastMetaStateUpdates(isPrimaryEligiblesOnly bool, isP
 		return
 	}
 	// b. prepare the broadcast target broker addr(s) //tBrokers := make([]string, 0)
+	//s.log.Info("[initBroadcastMetaStateUpdates] *** seems brokersMap is empty: ", s.GetAvailableBrokersMap(), " states: ", s.states, " ", s.inMemStates)
 	for _, tBroker := range s.GetAvailableBrokersMap() {
 		_needBCast := false
+		if strings.Compare(tBroker.GetID(), s.broker.GetBrokerID()) == 0 {
+			// ignore self broadcast, does not make sense...
+			continue
+		}
 		if isPrimaryEligiblesOnly && tBroker.IsPrimaryEligible() {
 			_needBCast = true
-			//tBrokers = append(tBrokers, tBroker.GetAddr())
 		} else {
 			_needBCast = true
-			//tBrokers = append(tBrokers, tBroker.GetAddr())
 		}
 		if _needBCast {
+			s.log.Infof("[initBroadcastMetaStateUpdates] target [%v]\n", tBroker.GetAddr())
 			// goroutine / thread
 			go func() {
 				_isOffline, err1 := s._broadcastToTargetBroker(tBroker.GetAddr(), isPrimaryReElected)
@@ -716,4 +735,47 @@ func (s *Service) _getRandomTimer() (timer *time.Timer) {
 	timer = time.NewTimer(time.Duration(_randomInterval) * time.Millisecond)
 
 	return
+}
+
+func (s *Service) _upsertBrokerToBrokersMap(id, name, addr string, isPrimaryEligible bool) {
+	_m := s.GetAvailableBrokersMap()
+	_m[id] = BrokerMeta{
+		id:                id,
+		name:              name,
+		addr:              addr,
+		isPrimaryEligible: isPrimaryEligible,
+	}
+}
+
+// _infoLogBrokersStatus - method to print out the primary and other broker(s) nicely
+func (s *Service) _infoLogBrokersStatus() string {
+	var _s strings.Builder
+	_d := ": "
+	_m := s.GetAvailableBrokersMap()
+	id, name, addr, avail := s.GetElectedPrimaryBrokerInfo()
+	if avail {
+		_s.WriteString("[PRIMARY]")
+		_b := BrokerMeta{id: id, name: name, addr: addr, isPrimaryEligible: true}
+		_s.WriteString(_b.SerializeToString())
+		_s.WriteString(_d)
+		// add the primary back to the brokers map if missing
+		if IsBrokerMetaStructNil(_m[id]) {
+			_m[id] = _b
+		}
+	}
+	// rest of the brokers
+	_i := 0
+	for _, _b := range _m {
+		// excluding primary
+		if strings.Compare(_b.id, id) != 0 {
+			if _i > 0 {
+				_s.WriteString(_d)
+			}
+			_s.WriteString(_b.SerializeToString())
+		}
+		_i++
+	}
+	_log := _s.String()
+	//s.log.Infof("available brokers {%v}\n", _log)
+	return _log
 }
