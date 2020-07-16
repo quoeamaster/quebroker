@@ -199,8 +199,10 @@ func (s *Service) ClientInitElectionRequest() {
 	}
 
 	// start the request polling
-	_srvs := make([]MetastateServiceClient, len(_targetBrokers))
-	_gConns := make([]*grpc.ClientConn, len(_targetBrokers))
+	//_srvs := make([]MetastateServiceClient, len(_targetBrokers))
+	//_gConns := make([]*grpc.ClientConn, len(_targetBrokers))
+	_srvs := make(map[string]MetastateServiceClient)
+	_gConns := make(map[string]*grpc.ClientConn)
 	defer func() {
 		for _, _gConn := range _gConns {
 			if _gConn != nil {
@@ -233,9 +235,9 @@ func (s *Service) ClientInitElectionRequest() {
 		}
 
 		// _tBroker = the target broker's address
-		for i, _tBroker := range _targetBrokers {
+		for _, _tBroker := range _targetBrokers {
 			// create connection and store it for re-use
-			_srv := _srvs[i]
+			_srv := _srvs[_tBroker]
 			if _srv == nil {
 				_gConn, err := grpc.Dial(_tBroker, grpc.WithInsecure())
 				if err != nil {
@@ -243,8 +245,8 @@ func (s *Service) ClientInitElectionRequest() {
 					continue
 				}
 				_srv = NewMetastateServiceClient(_gConn)
-				_srvs[i] = _srv
-				_gConns[i] = _gConn // required... as you need to clean up the ClientConn after election done
+				_srvs[_tBroker] = _srv
+				_gConns[_tBroker] = _gConn // required... as you need to clean up the ClientConn after election done
 			} // if (create grpc.ClientConn and set _srvs content)
 
 			// the Timer random interval (kind of throttle before issuing the dial)
@@ -358,14 +360,17 @@ func (s *Service) InitiateClusterJoin(ctx context.Context, req *ClusterJoinReque
 // ClientInitClusterJoinRequest - initiate the join cluster request by non primary-eligible broker(s)
 func (s *Service) ClientInitClusterJoinRequest() {
 	_tBrokers := s.broker.GetBootstrapInitialPrimaryBrokersList()
-	_gConns := make([]*grpc.ClientConn, len(_tBrokers))
-	_srvs := make([]MetastateServiceClient, len(_tBrokers))
+	//_gConns := make([]*grpc.ClientConn, len(_tBrokers))
+	//_srvs := make([]MetastateServiceClient, len(_tBrokers))
+	_gConns := make(map[string]*grpc.ClientConn)
+	_srvs := make(map[string]MetastateServiceClient)
 	defer func() {
 		for _, _gConn := range _gConns {
 			if _gConn != nil {
 				_gConn.Close()
 			}
 		}
+		_gConns = nil
 		_srvs = nil
 	}()
 
@@ -383,8 +388,8 @@ func (s *Service) ClientInitClusterJoinRequest() {
 		s.mux.Unlock()
 
 		// a. dial / connect to each targeted broker
-		for i, _tBroker := range _tBrokers {
-			_srv := _srvs[i]
+		for _, _tBroker := range _tBrokers {
+			_srv := _srvs[_tBroker]
 			if _srv == nil {
 				_gConn, err := grpc.Dial(_tBroker, grpc.WithInsecure())
 				if err != nil {
@@ -392,8 +397,8 @@ func (s *Service) ClientInitClusterJoinRequest() {
 					continue
 				}
 				_srv = NewMetastateServiceClient(_gConn)
-				_gConns[i] = _gConn
-				_srvs[i] = _srv
+				_gConns[_tBroker] = _gConn
+				_srvs[_tBroker] = _srv
 			}
 			// send join request
 			<-s._getRandomTimerForJoinCluster().C
