@@ -43,6 +43,8 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 	if _, _, _, avail := s.GetElectedPrimaryBrokerInfo(); avail {
 		// update the brokersMap to add in this instance too
 		s._upsertBrokerToBrokersMap(req.BrokerID, req.BrokerName, req.BrokerAddr, true)
+		// update version state as well since change in brokersMap content
+		s._persist(true)
 
 		s.log.Info("[InitiateElectionRequest] broadcast sent to brokers since Primary Broker already ELECTED")
 		s.initBroadcastMetaStateUpdates(false, false)
@@ -74,7 +76,8 @@ func (s *Service) InitiateElectionRequest(ctx context.Context, req *ElectionRequ
 		// update this broker's primary states
 		s.UpsertInMem(KeyPrimaryBroker, true, true)
 		s._updateElectionWonInMemStates(s.broker.GetBrokerID(), s.broker.GetBrokerName(), s.broker.GetBrokerAddr())
-		// TODO: trigger the broadcast here after a throttle e.g. 2 seconds ~~~ NOW
+		// [QQ] trigger the broadcast here after a throttle e.g. 2 seconds~~
+		// no need since the upper Primary Broker Check would also trigger broadcast
 
 	} else {
 		// - lose
@@ -296,6 +299,7 @@ func (s *Service) InitiateClusterJoin(ctx context.Context, req *ClusterJoinReque
 			},
 		}
 		if strings.Compare(s.broker.GetBrokerID(), id) == 0 {
+			s.log.Infof("[InitiateClusterJoin self] forward to itself the cluster join operations\n")
 			_resp1, err2 := s.ForwardClusterJoin(ctx, _fwdRequest)
 			if err2 != nil {
 				s.log.Errorf("[InitiateClusterJoin self] forward to Elected Primary on cluster join request failed, reason: [%v]\n", err2)
@@ -306,6 +310,7 @@ func (s *Service) InitiateClusterJoin(ctx context.Context, req *ClusterJoinReque
 		} else {
 			// create connection to Primary and forward the request
 			// should be fwd to the ELECTED primary... (unless this broker is the ONE)
+			s.log.Infof("[InitiateClusterJoin fwd] forward to [%v] the cluster join operations\n", addr)
 			_gConn, err2 := grpc.Dial(addr, grpc.WithInsecure())
 			if err2 != nil {
 				err = err2
@@ -330,7 +335,7 @@ func (s *Service) InitiateClusterJoin(ctx context.Context, req *ClusterJoinReque
 			res.Stateversion = _resp.GetStateversion()
 			res.BrokersMap = _resp.GetBrokersMap()
 
-			// TODO: trigger a broadcast to primary eligible brokers
+			// need to self update? nah... broadcast is coming
 
 		} else if _resp.GetStatus() == fwdStatusCode500 {
 			// error
@@ -401,6 +406,7 @@ func (s *Service) ClientInitClusterJoinRequest() {
 			if err != nil {
 				// mostly connectivity issues, though very rare (should already failed earlier)
 				s.log.Debugf("[ClientInitClusterJoinRequest] rare case, could not connect to the target broker[%v], reason:[%v]\n", _tBroker, err)
+				s.log.Infof("[ClientInitClusterJoinRequest] waiting for target broker [%v] to be availabe... initiate retry", _tBroker)
 				continue
 			}
 
@@ -456,23 +462,16 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 		Status: fwdStatusCode200,
 	}
 	// add this BrokerMeta too (missing or new)
-	_brokersMap := s.GetAvailableBrokersMap()
-	if IsBrokerMetaStructNil(s.inMemStates[KeyAvailableBrokers].(map[string]BrokerMeta)[req.GetBroker().GetId()]) {
-		s.inMemStates[KeyAvailableBrokers].(map[string]BrokerMeta)[req.GetBroker().GetId()] = BrokerMeta{
-			id:                req.GetBroker().GetId(),
-			name:              req.GetBroker().GetName(),
-			addr:              req.GetBroker().GetAddr(),
-			isPrimaryEligible: req.GetIsPrimaryEligible(),
-		}
-	}
+	s._upsertBrokerToBrokersMap(req.GetBroker().GetId(), req.GetBroker().GetName(), req.GetBroker().GetAddr(), req.GetIsPrimaryEligible())
 	// brokersMap serialization
+	_brokersMap := s.GetAvailableBrokersMap()
 	_brokerMetaList := make([]string, 0)
-	_brokersMap = s.GetAvailableBrokersMap() // get it again to make sure all brokers are added (the above missing one)
 	for _, _bMeta := range _brokersMap {
 		_brokerMetaList = append(_brokerMetaList, _bMeta.SerializeToString())
 	}
 	res.BrokersMap = _brokerMetaList
 
+	s.log.Tracef("[ForwardClusterJoin] ** b4 persist state %v-%v\n", s.GetStateVersion(), s.GetStateVersionID())
 	// update the state version as well...
 	if err2 := s._persist(true); err2 != nil {
 		s.log.Errorf("[ForwardClusterJoin] update state version failed, reason: %v\n", err2)
@@ -480,6 +479,7 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 		err = err2
 		return
 	}
+	s.log.Tracef("[ForwardClusterJoin] ** AFTER persist state %v-%v = %v\n", s.GetStateVersion(), s.GetStateVersionID(), s.statePathOnDisk)
 
 	// res update state version
 	_stateNum, err := strconv.Atoi(s.GetStateVersionID().(string))
@@ -487,6 +487,12 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 		StateVersion: s.GetStateVersion(),
 		StateNum:     int32(_stateNum),
 	}
+
+	// let Primary broker broadcast instead (since the most update info should be there)
+	// - update joining broker into brokerMap as well
+	// - broadcast
+	s.initBroadcastMetaStateUpdates(false, false)
+
 	return
 }
 
@@ -494,6 +500,23 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 // (basically to primary eligible brokers, as they are backups for being primary election when necessary)
 // (exception is when the primary broker has been re-elected; then all available brokers MUST be broadcasted / informed)
 func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastRequest) (res *BroadcastResponse, err error) {
+	// check if the meta states are stale or up-to-date; stale / old states should be IGNORED
+	_localStateVerNum, err := strconv.Atoi(s.GetStateVersionID().(string))
+	if err != nil {
+		s.log.Warnf("[BroadcastMetaStateUpdates] could not convert local State ID, reason: %v\n", err)
+	} else {
+		if req.Stateversion.GetStateNum() <= int32(_localStateVerNum) {
+			s.log.Infof("[BroadcastMetaStateUpdates] stale / less update state encountered, skip this update")
+			// MUST create an empty response before returning (nil would cause exception)
+			res = &BroadcastResponse{
+				Status: broadcastStatusCode200,
+			}
+			return
+		}
+	}
+
+	s.log.Debugf("[BroadcastMetaStateUpdates] received broadcast update [%v] - latest state version [%v - %v]\n",
+		s.broker.GetBrokerAddr(), req.Stateversion.GetStateVersion(), req.Stateversion.GetStateNum())
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -555,16 +578,19 @@ func (s *Service) initBroadcastMetaStateUpdates(isPrimaryEligiblesOnly bool, isP
 			_needBCast = true
 		}
 		if _needBCast {
-			s.log.Infof("[initBroadcastMetaStateUpdates] target [%v]\n", tBroker.GetAddr())
+			tBrokerAddr := tBroker.GetAddr()
+			tBrokerID := tBroker.GetID()
 			// goroutine / thread
 			go func() {
-				_isOffline, err1 := s._broadcastToTargetBroker(tBroker.GetAddr(), isPrimaryReElected)
+				s.log.Debugf("[initBroadcastMetaStateUpdates] target [%v]\n", tBrokerAddr)
+
+				_isOffline, err1 := s._broadcastToTargetBroker(tBrokerAddr, isPrimaryReElected)
 				if err1 != nil {
-					s.log.Warnf("[initBroadcastMetaStateUpdates] target broker (%v) cannot be connected, reason: %v\n", tBroker.GetAddr(), err1)
+					s.log.Warnf("[initBroadcastMetaStateUpdates] target broker (%v) cannot be connected, reason: %v\n", tBrokerAddr, err1)
 				}
 				// marke offline => would trigger another round of broadcast though
 				if _isOffline {
-					s.markOfflineForBroker(tBroker.GetID(), tBroker.GetAddr())
+					s.markOfflineForBroker(tBrokerID, tBrokerAddr)
 				}
 			}()
 		}
@@ -606,6 +632,7 @@ func (s *Service) _broadcastToTargetBroker(addr string, isPrimaryReElected bool)
 	_bcastSuccess := false
 	// 3 times of retrial (each retrial is 1.5 seconds) roughly within 5 seconds will know if a broker is offline or not
 	for i := 0; i < maxBroadcastRetrial; i++ {
+		s.log.Debugf("[_broadcastToTargetBroker] *** b4 calling grpc BroadcastMetaStateUpdates %v - trial: %v\n", addr, i)
 		_resp, err := srv.BroadcastMetaStateUpdates(context.Background(), &BroadcastRequest{
 			IsPrimaryReElected:   isPrimaryReElected,
 			PrimaryBroker:        _pBroker,

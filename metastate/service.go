@@ -124,6 +124,7 @@ func (s *Service) _persist(updateStateVersion bool) (err error) {
 			err = r.(error)
 		}
 	}()
+	s.log.Infof("[_persist] current version and id [%v - %v]\n", s.GetStateVersion(), s.GetStateVersionID())
 	bContent, err := json.Marshal(s.states)
 	if err != nil {
 		return
