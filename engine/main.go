@@ -86,24 +86,6 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	}()
 
 	// e. bootstrap services (related)
-	// - 1. update the current meta-state, at least
-	// TODO: should have the following logic
-	// 	1) is this broker PRIMARY (master); if so, it could update state-version and others etc
-	//		2) state-version should be related to timestamp and hence later versions of the state could be identified
-	//broker.MetaState.Upsert(metastate.KeyStateVersion, "temp-setup-value-100001")
-	/*
-		_, err = broker.MetaState.UpsertInMem("testing-A", 1234567890)
-		_, _, err = broker.MetaState.UpsertStateVersionByPrimaryBroker()
-		log.Infof("[updated state version and ID] [%v] - num [%v]\n",
-			broker.MetaState.GetStateVersion(),
-			broker.MetaState.GetStateVersionID())
-		_, err = broker.MetaState.Upsert("testing-Z", "nice to have it persisted", true, false) // if last param is true... update state-version one more time
-		if err != nil {
-			return
-		}
-	*/
-
-	// z. start to serve (with all services registered)
 	log.Infof("[bootstrap broker] address: %v", tcpListener.Addr().String())
 	go func() {
 		log.Infof("[engine] forming cluster...")
@@ -112,6 +94,7 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 		_clusterForming(broker)
 	}()
 
+	// z. start to serve (with all services registered)
 	err1 = gRPCServer.Serve(tcpListener)
 	if err1 != nil {
 		err = fmt.Errorf("failed to start up the RPC server, reason %v", err1)
@@ -120,6 +103,7 @@ func _startServer() (broker *quebroker.Broker, tcpListener net.Listener, gRPCSer
 	return
 }
 
+// _clusterForming - boostrap a multiple broker architecture (forming and joining cluster)
 func _clusterForming(broker *quebroker.Broker) {
 	// PS. panic directly if met fatal exceptions
 	_t := time.NewTimer(2 * time.Second)
