@@ -131,7 +131,7 @@ func (b *Broker) setupServices() {
 	// TODO: update service definitions here
 	log.Trace("setup on services")
 	b.Vision = vision.New()
-	b.MetaState = metastate.New(brokerHomeDir, b)
+	b.MetaState = metastate.New(b.Path.Data, b)
 }
 
 /* ----------------------------------------------------------- */

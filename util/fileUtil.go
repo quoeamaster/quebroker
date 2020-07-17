@@ -37,6 +37,7 @@ func IsFileExists(path string, paths ...string) (exists bool, configPath string)
 	_, err := os.Stat(_path)
 	if os.IsNotExist(err) {
 		exists = false
+		configPath = _path
 		return
 	}
 	// all good

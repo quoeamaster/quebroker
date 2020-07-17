@@ -46,13 +46,13 @@ type Service struct {
 }
 
 // New - create instance of meta-state service
-func New(brokerHomeDir string, broker IBroker) (s *Service) {
+func New(dataPath string, broker IBroker) (s *Service) {
 	s = new(Service)
 	s.setupLogger()
 	s.broker = broker
 	// load or create a brand new "states"
 	s.states = make(map[string]interface{})
-	err := s._loadMetaStates(brokerHomeDir, s.broker.GetBrokerID())
+	err := s._loadMetaStates(dataPath)
 	if err != nil {
 		panic(fmt.Errorf("meta-state service bootstrap failed, reason: %v", err))
 	}
@@ -75,14 +75,9 @@ func (s *Service) setupLogger() {
 
 // _loadMetaStates - method to check whether a previous states info stored or not;
 //		if so, load it back from file system
-func (s *Service) _loadMetaStates(brokerHomeDir, brokerID string) (err error) {
+func (s *Service) _loadMetaStates(dataPath string) (err error) {
 	// a. check whether the state file is available or not
-	_homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	s.statePathOnDisk = fmt.Sprintf("%v%v%v%v%v%v%v", _homeDir, string(os.PathSeparator), brokerHomeDir,
-		string(os.PathSeparator), brokerID, string(os.PathSeparator), stateFilename)
+	s.statePathOnDisk = fmt.Sprintf("%v%v%v", dataPath, string(os.PathSeparator), stateFilename)
 
 	if _exists, _ := util.IsFileExists(s.statePathOnDisk); _exists {
 		// b. available - load / unmarshal back to map[string]interface{}
@@ -95,7 +90,7 @@ func (s *Service) _loadMetaStates(brokerHomeDir, brokerID string) (err error) {
 			return err
 		}
 		// assume states (map) populated
-		//s.log.Infof("states loaded: <%v>\n", s.states)
+		s.log.Tracef("[_loadMetaStates] ** states loaded: <%v>\n", s.states)
 	}
 	return
 }
@@ -229,9 +224,6 @@ func (s *Service) GetStateVersion() string {
 func (s *Service) GetStateVersionID() interface{} {
 	return s.states[KeyStateVersionID]
 }
-
-// TODO: json diff
-// TODO: provide a map with keys for updating (means multiple updates in one api call)
 
 // GetElectedPrimaryBrokerInfo - return the elected broker's ID, name, address if Election already DONE.
 // Data within the IN-MEM states
@@ -373,3 +365,6 @@ func IsBrokerMetaStructNil(val BrokerMeta) (isNil bool) {
 	}
 	return
 }
+
+// TODO: json diff
+// TODO: provide a map with keys for updating (means multiple updates in one api call)

@@ -506,17 +506,21 @@ func (s *Service) ForwardClusterJoin(ctx context.Context, req *ForwardClusterJoi
 // (exception is when the primary broker has been re-elected; then all available brokers MUST be broadcasted / informed)
 func (s *Service) BroadcastMetaStateUpdates(ctx context.Context, req *BroadcastRequest) (res *BroadcastResponse, err error) {
 	// check if the meta states are stale or up-to-date; stale / old states should be IGNORED
-	_localStateVerNum, err := strconv.Atoi(s.GetStateVersionID().(string))
-	if err != nil {
-		s.log.Warnf("[BroadcastMetaStateUpdates] could not convert local State ID, reason: %v\n", err)
-	} else {
-		if req.Stateversion.GetStateNum() <= int32(_localStateVerNum) {
-			s.log.Infof("[BroadcastMetaStateUpdates] stale / less update state encountered, skip this update")
-			// MUST create an empty response before returning (nil would cause exception)
-			res = &BroadcastResponse{
-				Status: broadcastStatusCode200,
+	_localStateVerNumRaw := s.GetStateVersionID()
+	if _localStateVerNumRaw != nil {
+		_localStateVerNum, err1 := strconv.Atoi(_localStateVerNumRaw.(string))
+		if err1 != nil {
+			s.log.Warnf("[BroadcastMetaStateUpdates] could not convert local State ID, reason: %v\n", err)
+		} else {
+			if req.Stateversion.GetStateNum() <= int32(_localStateVerNum) {
+				s.log.Infof("[BroadcastMetaStateUpdates] stale / less update state encountered, skip this update")
+				// MUST create an empty response before returning (nil would cause exception)
+				res = &BroadcastResponse{
+					Status: broadcastStatusCode200,
+				}
+				err = err1
+				return
 			}
-			return
 		}
 	}
 

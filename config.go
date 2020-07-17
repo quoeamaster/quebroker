@@ -32,13 +32,14 @@ import (
 )
 
 // CreateFolders - method to create folder(s) such as Path.Data, Path.Log
-func (b *Broker) CreateFolders() (err error) {
+func (b *Broker) createFolders() (err error) {
 	_oldUMask := syscall.Umask(0)
 
 	var _folderRight os.FileMode
 	_folderRight = 0755 // for writes... (so creation of file need 'X', hence owner should be RWX = 7, others... usually for R+X = 5)
 
 	// [Path] Data
+	log.Tracef("[createFolders] *** data: %v log: %v", b.Path.Data, b.Path.Log)
 	_exists, _ := util.IsFileExists(b.Path.Data)
 	if !_exists {
 		err = os.MkdirAll(b.Path.Data, _folderRight)
@@ -61,20 +62,15 @@ func (b *Broker) CreateFolders() (err error) {
 }
 
 // PopulateBrokerIDs - populate / create corresponding Broker ID(s) (e.g. broker.id, cluster.id)
-func (b *Broker) PopulateBrokerIDs() (err error) {
+func (b *Broker) populateBrokerIDs() (err error) {
 	// "go tool dist list" - list all valid OS architecture
-	// a. find HOME directory
-	_home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	// b. generate id
+	// a. generate id
 	err = b.generateIDs()
 	if err != nil {
 		return
 	}
 	// replace ENV VARS from the config strings (needs to update manually....)
-	// DOC: study on using reflection ? (but performance penalty)
+	// [DOC]: study on using reflection ? (but performance penalty)
 	_re, err := regexp.Compile(`\$\{[a-z|A-Z|_|-]+\}`)
 	if err != nil {
 		return
@@ -86,40 +82,40 @@ func (b *Broker) PopulateBrokerIDs() (err error) {
 	if err != nil {
 		return
 	}
-	b.Path.Data = replaceEnvVarValuesToString(b.Path.Data, _re, b.ID)
-	b.Path.Log = replaceEnvVarValuesToString(b.Path.Log, _re, b.ID)
+	b.Path.Data = fmt.Sprintf("%v%v%v", replaceEnvVarValuesToString(b.Path.Data, _re, b.ID), string(os.PathSeparator), b.ID)
+	b.Path.Log = fmt.Sprintf("%v%v%v", replaceEnvVarValuesToString(b.Path.Log, _re, b.ID), string(os.PathSeparator), b.ID) // replaceEnvVarValuesToString(b.Path.Log, _re, b.ID)
 
 	// TODO: update the setters when new config values are available
 
-	// c. {home}/.quebroker exists?
-	_exists, _homePath := util.IsFileExists(_home, brokerHomeDir, string(os.PathSeparator), b.ID)
+	// b. {home}/.quebroker exists? logics inside createFolders()
+	err = b.createFolders()
+	if err != nil {
+		return
+	}
+
+	// c. create the "id" files
+	_exists, _homePath := util.IsFileExists(b.Path.Data, brokerIDFile)
+	log.Tracef("[populateBrokerIDs] *** exists and path? %v - %v\n", _exists, _homePath)
 	if !_exists {
 		_umaskOld := syscall.Umask(0) // resetting the umask on creating file's permission
-		// d. create home folder .quebroker
-		_homePath = fmt.Sprintf("%v%v%v%v%v", _home, string(os.PathSeparator), brokerHomeDir, string(os.PathSeparator), b.ID)
-		err = os.MkdirAll(_homePath, 0755) // 755 or 644 (RWX => 421)
-		if err != nil {
-			return
-		}
 		// e. create the id files under the home folder (.quebroker)
-		err = b.createIDFile(_homePath, brokerIDFile, b.ID)
+		err = b.createIDFile("", _homePath, b.ID)
 		if err != nil {
 			return
 		}
-		err = b.createIDFile(_homePath, brokerClusterIDFile, b.Cluster.ID)
+		err = b.createIDFile(b.Path.Data, brokerClusterIDFile, b.Cluster.ID)
 		if err != nil {
 			return
 		}
-
 		// reset the umask
 		syscall.Umask(_umaskOld)
 	} else {
 		// load the .broker.id and .cluster.id file values back to the Broker instance
-		b.ID, err = b.readIDFromFile(_homePath, brokerIDFile)
+		b.ID, err = b.readIDFromFile("", _homePath)
 		if err != nil {
 			return
 		}
-		b.Cluster.ID, err = b.readIDFromFile(_homePath, brokerClusterIDFile)
+		b.Cluster.ID, err = b.readIDFromFile(b.Path.Data, brokerClusterIDFile)
 		if err != nil {
 			return
 		}
@@ -206,12 +202,7 @@ func BrokerInstanceFromTomlConfig() (instance *Broker, err error) {
 		return
 	}
 	// populate id(s)
-	err = instance.PopulateBrokerIDs()
-	if err != nil {
-		return
-	}
-	// create folder(s) e.g. path.data, path.log
-	err = instance.CreateFolders()
+	err = instance.populateBrokerIDs()
 	if err != nil {
 		return
 	}
@@ -247,7 +238,10 @@ func replaceEnvVarValuesToString(value string, re *regexp.Regexp, brokerID strin
 			if err != nil {
 				return
 			}
-			_replace = fmt.Sprintf("%v%v%v%v%v", _replace, string(os.PathSeparator), brokerHomeDir, string(os.PathSeparator), brokerID)
+			//_replace = fmt.Sprintf("%v%v%v%v%v", _replace, string(os.PathSeparator), brokerHomeDir, string(os.PathSeparator), brokerID)
+			// [DOC]: structure should be xxx/data/.state, xxx/data/.broker.id, xxx/data/.cluster.id,
+			// xxxx/data/{broker.id} <- store actual data files
+			_replace = fmt.Sprintf("%v%v%v", _replace, string(os.PathSeparator), brokerHomeDir)
 			finalValue = strings.Replace(finalValue, _param, _replace, 1)
 
 		default:
